@@ -139,10 +139,10 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
         </select>
       </label>
       <label for="vistekst">Vis teksten, der læses op
-        <select id="vistekst"><option value="ja">Ja</option><option value="nej">Nej</option></select>
+        <select id="vistekst"><option value="nej">Nej</option><option value="ja">Ja</option></select>
       </label>
     </div>
-    <p class="lille">Kommandoer ved bippet: sig «gentag», «tilbage» eller «pause». Sig «næste» alene for at gå videre uden kommentar. I pause: sig «fortsæt». Rattets knapper og Siri kan også sætte på pause og fortsætte.</p>
+    <p class="lille">Med Tale til tekst: sig «gentag», «tilbage» eller «pause» ved bippet, og «næste» alene for at gå videre uden kommentar. I pause: sig «fortsæt». Med Optag lyd gemmes kommentaren, når du har været stille, og kommandoerne virker ikke. Rattets knapper kan altid sætte på pause og fortsætte.</p>
     <p class="lille" id="byggeinfo"></p>
   </details>
 </main>
@@ -274,6 +274,7 @@ function lytTale({ vent, stille, kunKommando }) {
         clearTimeout(tStille); tStille = setTimeout(() => afslut(efterTekst()), stille * 1000);
       };
       rec.onerror = e => {
+        if (tekst() && !kunKommando) return afslut(efterTekst());
         if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") return afslut({ type: "fejl", fejl: e.error });
       };
       rec.onend = () => {
@@ -338,7 +339,7 @@ function lytOptag({ vent, stille }) {
 
 async function lyt(kunKommando = false) {
   $("udskrift").textContent = "";
-  const valg = { vent: tal("vent"), stille: tal("stille"), kunKommando };
+  const valg = { vent: kunKommando ? 0 : tal("vent"), stille: tal("stille"), kunKommando };
   if (!kunKommando) {
     saetTilstand("bip");
     const ok = await spil(BIP.tal, 1);
