@@ -128,7 +128,7 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
         <input id="vent" type="number" min="2" max="15" step="0.5" value="4">
       </label>
       <label for="stille">Sekunders stilhed, før kommentaren gemmes
-        <input id="stille" type="number" min="1.5" max="15" step="0.5" value="4">
+        <input id="stille" type="number" min="1.5" max="15" step="0.5" value="6">
       </label>
       <label for="hvile">Sekunder fra lytning til oplæsning
         <input id="hvile" type="number" min="0" max="5" step="0.5" value="1.5">
@@ -162,8 +162,14 @@ let koersel = 0, afbryd = null;
 
 /* ---------- indstillinger ---------- */
 const IND = ["modus", "slutord", "vent", "stille", "hvile", "tempo", "vistekst"];
-function laesInd() { try { const o = JSON.parse(localStorage.getItem("ind") || "{}"); IND.forEach(k => { if (o[k] != null) $(k).value = o[k]; }); } catch (e) {} }
-function gemInd() { try { const o = {}; IND.forEach(k => o[k] = $(k).value); localStorage.setItem("ind", JSON.stringify(o)); } catch (e) {} }
+function laesInd() {
+  try {
+    const o = JSON.parse(localStorage.getItem("ind") || "{}");
+    if (!o._v && o.stille === "4") o.stille = "6";  // standarden var 4 s før 25-10-26 kl. 21
+    IND.forEach(k => { if (o[k] != null) $(k).value = o[k]; });
+  } catch (e) {}
+}
+function gemInd() { try { const o = { _v: 2 }; IND.forEach(k => o[k] = $(k).value); localStorage.setItem("ind", JSON.stringify(o)); } catch (e) {} }
 const ind = k => $(k).value;
 const tal = k => parseFloat($(k).value) || 0;
 
@@ -244,10 +250,14 @@ function stopAlt() { koersel++; if (afbryd) { const f = afbryd; afbryd = null; f
 const Gjenk = window.SpeechRecognition || window.webkitSpeechRecognition;
 const rens = t => t.toLowerCase().replace(/[.,!?;:«»"]/g, "").replace(/\s+/g, " ").trim();
 const KOMMANDO = { "gentag": "gentag", "tilbage": "tilbage", "pause": "pause", "stop": "pause", "fortsæt": "fortsaet" };
+// Siri hører «næste» som fx «heste» eller «bedste». De sikre varianter afslutter kommentaren;
+// «bedste» er et almindeligt ord og fjernes kun, når det står sidst i en kommentar, der er sluttet af stilhed.
+const varianter = s => s === "næste" ? { slut: ["næste", "neste", "næst", "nest", "heste"], fjern: ["bedste"] } : { slut: [s], fjern: [] };
+const fjernSidst = (t, ord) => t.replace(new RegExp("[\\s,.]*\\b(" + ord.join("|") + ")[\\s.!?]*$", "i"), "").trim();
 
 function lytTale({ vent, stille, kunKommando }) {
   return new Promise(res => {
-    const slutord = rens(ind("slutord") || "næste");
+    const v = varianter(rens(ind("slutord") || "næste"));
     let rec = null, grund = "", nu = "", slut = false, tStart, tStille, talt = false;
     const tekst = () => (grund + " " + nu).replace(/\s+/g, " ").trim();
     const afslut = r => {
@@ -255,7 +265,7 @@ function lytTale({ vent, stille, kunKommando }) {
       try { rec && rec.abort(); } catch (e) {}
       res(r);
     };
-    const efterTekst = () => { const t = tekst(); return t ? { type: "kommentar", tekst: t } : { type: "ingen" }; };
+    const efterTekst = () => { const t = fjernSidst(tekst(), v.slut.concat(v.fjern)); return t ? { type: "kommentar", tekst: t } : { type: "ingen" }; };
     afbryd = () => afslut({ type: "afbrudt" });
     const ny = () => {
       rec = new Gjenk(); rec.lang = "da-DK"; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
@@ -268,12 +278,10 @@ function lytTale({ vent, stille, kunKommando }) {
         if (!talt) { talt = true; clearTimeout(tStart); if (!kunKommando) saetTilstand("optager"); }
         $("udskrift").textContent = t;
         if (KOMMANDO[r]) return afslut({ type: KOMMANDO[r] });
+        if (/^gentag\b|\bgentag$/.test(r) && r.split(" ").length <= 4) return afslut({ type: "gentag" });
         if (kunKommando) { clearTimeout(tStille); tStille = setTimeout(() => { grund = ""; nu = ""; talt = false; }, 2500); return; }
-        if (r === slutord) return afslut({ type: "ingen" });
-        if (r.endsWith(" " + slutord)) {
-          const ren = t.replace(new RegExp("[\\s,.]*" + slutord + "[\\s.!?]*$", "i"), "").trim();
-          return afslut({ type: "kommentar", tekst: ren });
-        }
+        if (v.slut.includes(r)) return afslut({ type: "ingen" });
+        if (v.slut.some(o => r.endsWith(" " + o))) return afslut({ type: "kommentar", tekst: fjernSidst(t, v.slut) });
         clearTimeout(tStille); tStille = setTimeout(() => afslut(efterTekst()), stille * 1000);
       };
       rec.onerror = e => {
@@ -515,7 +523,8 @@ async function del() {
   const { alle, filer: f } = await filer();
   if (!alle.length) return visBesked("Der er ingen kommentarer endnu.");
   if (navigator.canShare && navigator.canShare({ files: f })) {
-    try { await navigator.share({ files: f, title: "Kommentarer til " + S.meta.rapport }); return; } catch (e) { if (e.name === "AbortError") return; }
+    // ingen title: iPhonen gemmer den som en ekstra, tom .txt-fil
+    try { await navigator.share({ files: f }); return; } catch (e) { if (e.name === "AbortError") return; }
   }
   f.forEach(fil => { const a = document.createElement("a"); a.href = URL.createObjectURL(fil); a.download = fil.name; document.body.append(a); a.click(); a.remove(); });
 }
