@@ -130,6 +130,9 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
       <label for="stille">Sekunders stilhed, før kommentaren gemmes
         <input id="stille" type="number" min="1.5" max="15" step="0.5" value="4">
       </label>
+      <label for="hvile">Sekunder fra lytning til oplæsning
+        <input id="hvile" type="number" min="0" max="5" step="0.5" value="1.5">
+      </label>
       <label for="tempo">Tempo (Jeppe er allerede 10 % hurtigere)
         <select id="tempo">
           <option value="0.9">90 %</option>
@@ -158,7 +161,7 @@ const S = { stykker: [], meta: {}, i: 0, t: "klar", noegle: null, cache: null, u
 let koersel = 0, afbryd = null;
 
 /* ---------- indstillinger ---------- */
-const IND = ["modus", "slutord", "vent", "stille", "tempo", "vistekst"];
+const IND = ["modus", "slutord", "vent", "stille", "hvile", "tempo", "vistekst"];
 function laesInd() { try { const o = JSON.parse(localStorage.getItem("ind") || "{}"); IND.forEach(k => { if (o[k] != null) $(k).value = o[k]; }); } catch (e) {} }
 function gemInd() { try { const o = {}; IND.forEach(k => o[k] = $(k).value); localStorage.setItem("ind", JSON.stringify(o)); } catch (e) {} }
 const ind = k => $(k).value;
@@ -353,6 +356,7 @@ async function lyt(kunKommando = false) {
 }
 
 /* ---------- gang gennem stykkerne ---------- */
+const hvil = ms => new Promise(r => setTimeout(r, ms));
 const gruppeStart = i => { while (i > 0 && !S.stykker[i - 1].stop) i--; return i; };
 function gemPos() { try { localStorage.setItem("pos:" + S.meta.rapport, String(S.i)); } catch (e) {} }
 
@@ -373,6 +377,8 @@ async function koer(fra) {
     if (s.stop) {
       const r = await lyt();
       if (mit !== koersel) return;
+      // iPhonen skifter lyden tilbage fra mikrofon til højttaler; uden pausen skæres starten af
+      if (r.type !== "afbrudt") { await hvil(tal("hvile") * 1000); if (mit !== koersel) return; }
       if (r.type === "gentag") { await spil(BIP.gemt, 1); S.i = gruppeStart(S.i); continue; }
       if (r.type === "tilbage") { await spil(BIP.gemt, 1); S.i = gruppeStart(Math.max(0, gruppeStart(S.i) - 1)); continue; }
       if (r.type === "pause") { S.i++; gemPos(); pause(); return; }
@@ -415,7 +421,12 @@ async function startKnap() {
   if (S.t === "klar" || S.t === "faerdig") {
     await laasLydOp();
     koer(parseInt($("afsnit").value, 10) || 0);
-  } else if (S.t === "pause") { await laasLydOp(); koer(S.i); }
+  } else if (S.t === "pause") {
+    await laasLydOp();
+    const fra = S.nytValg ? (parseInt($("afsnit").value, 10) || 0) : S.i;
+    S.nytValg = false;
+    koer(fra);
+  }
   else pause();
 }
 async function laasLydOp() {
@@ -548,6 +559,7 @@ async function init() {
   laesInd();
   IND.forEach(k => $(k).addEventListener("change", () => { gemInd(); modusMaerke(); }));
   $("start").onclick = startKnap;
+  $("afsnit").addEventListener("change", () => { S.nytValg = true; });
   $("naeste").onclick = () => { let j = S.i; while (j < S.stykker.length - 1 && !S.stykker[j].stop) j++; koer(Math.min(S.stykker.length - 1, j + 1)); };
   $("tilbage").onclick = () => koer(gruppeStart(Math.max(0, gruppeStart(S.i) - 1)));
   $("gentag").onclick = () => koer(gruppeStart(S.i));
