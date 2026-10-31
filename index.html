@@ -85,6 +85,7 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
     <div class="hvor" id="hvor">Vælg, hvor du vil starte, og tryk Start.</div>
     <div class="fremdrift" aria-hidden="true"><i id="fremdrift"></i></div>
     <div class="udskrift" id="udskrift"></div>
+    <input id="skriv" type="text" hidden placeholder="… eller skriv kommentaren her og tryk Slut" autocomplete="off">
   </section>
 
   <section class="laesning" id="laesning" hidden></section>
@@ -114,6 +115,12 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
   <details id="kommentarer">
     <summary id="komtitel">Kommentarer (0)</summary>
     <div class="raekke">
+      <button id="ret" class="anden">Ret kommentarer</button>
+      <button id="hentsvar" class="anden">Hent svar</button>
+    </div>
+    <p class="lille" id="poststatus">«Ret kommentarer» sender de usendte kommentarer til postkassen; rapporten rettes på pc'en, og svaret står under hver kommentar, når du trykker «Hent svar».</p>
+    <div class="raekke">
+      <button id="byglyd" class="anden">Opdater lyden</button>
       <button id="del" class="anden">Del kommentarerne</button>
       <button id="kopier" class="anden">Kopiér som tekst</button>
     </div>
@@ -158,6 +165,12 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
       <label for="vistekst">Vis teksten, der læses op
         <select id="vistekst"><option value="ja" selected>Ja, ord for ord</option><option value="nej">Nej</option></select>
       </label>
+      <label for="token">GitHub-token til «Ret kommentarer» og «Opdater lyden» (bliver kun på denne telefon)
+        <input id="token" type="password" autocomplete="off" placeholder="github_pat_…">
+      </label>
+      <label for="postrepo">Postkassens repo
+        <input id="postrepo" type="text" value="austudie-tgs/oplaesning" autocomplete="off" autocapitalize="off">
+      </label>
     </div>
     <p class="lille">Sig «stop», når du vil kommentere: oplæsningen stopper, ordet markeres med rødt, og det, du siger, skrives ned, til du siger «slut». Så gemmes kommentaren ved det ord, og oplæsningen fortsætter fra sætningens begyndelse. Knappen midtfor gør det samme (Stop, så Slut), og det gør rattets pause og play også. «Gentag» eller «tilbage» alene efter stop går tilbage uden kommentar; «slut» uden ord læser bare videre. I pause: sig «fortsæt» eller tryk Fortsæt.</p>
     <p class="lille" id="byggeinfo"></p>
@@ -176,7 +189,7 @@ const S = { stykker: [], meta: {}, i: 0, t: "klar", noegle: null, cache: null, u
 let koersel = 0, afbryd = null;
 
 /* ---------- indstillinger ---------- */
-const IND = ["modus", "lytstop", "stopord", "slutord", "tavs", "stille", "hvile", "tempo", "vistekst"];
+const IND = ["modus", "lytstop", "stopord", "slutord", "tavs", "stille", "hvile", "tempo", "vistekst", "token", "postrepo"];
 function laesInd() {
   try {
     const o = JSON.parse(localStorage.getItem("ind") || "{}");
@@ -219,11 +232,17 @@ async function hentNoegle() {
   let k = (location.hash.match(/k=([A-Za-z0-9_-]+)/) || [])[1];
   try { if (k) localStorage.setItem("k", k); else k = localStorage.getItem("k"); } catch (e) {}
   if (!k) return null;
-  return crypto.subtle.importKey("raw", b64url(k), "AES-GCM", false, ["decrypt"]);
+  return crypto.subtle.importKey("raw", b64url(k), "AES-GCM", false, ["encrypt", "decrypt"]);
 }
 async function dekrypter(buf) {
   return crypto.subtle.decrypt({ name: "AES-GCM", iv: buf.slice(0, 12) }, S.noegle, buf.slice(12));
 }
+async function krypter(bytes) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, S.noegle, bytes));
+  const ud = new Uint8Array(12 + ct.length); ud.set(iv); ud.set(ct, 12); return ud;
+}
+function b64(bytes) { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
 async function hentFil(sti) {
   let svar = null;
   if (S.cache) { try { svar = await S.cache.match(sti); } catch (e) {} }
@@ -386,13 +405,17 @@ function lytEfterStop() {
 function lytKommentar() {
   return new Promise(res => {
     let slut = false, tTavs = null, tMax = null, talt = false, hoert = "";
-    const afslut = r => { if (slut) return; slut = true; clearTimeout(tTavs); clearTimeout(tMax); S.slutNu = null; afbryd = null; Lyt.stop(); res(r); };
-    const slutMed = () => { const t = fjernSidst(hoert, varianter("slutord", "slut").concat(varianter("stopord", "stop"))); return t ? { type: "kommentar", tekst: t } : { type: "slut" }; };
+    const skriv = $("skriv");
+    const afslut = r => { if (slut) return; slut = true; clearTimeout(tTavs); clearTimeout(tMax); S.slutNu = null; afbryd = null; skriv.oninput = null; Lyt.stop(); res(r); };
+    // det skrevne gælder frem for det hørte, så kommentaren også kan skrives på pc'en eller rettes, før den gemmes
+    const slutMed = () => { const t = skriv.value.trim() || fjernSidst(hoert, varianter("slutord", "slut").concat(varianter("stopord", "stop"))); return t ? { type: "kommentar", tekst: t } : { type: "slut" }; };
     afbryd = () => afslut({ type: "afbrudt" });
     S.slutNu = () => afslut(slutMed());
     const tavs = tal("tavs") || 30;
     tTavs = setTimeout(() => { if (!talt) afslut({ type: "pause" }); }, tavs * 1000);
     tMax = setTimeout(() => afslut(slutMed()), 15 * 60 * 1000);
+    skriv.oninput = () => { if (!talt) { talt = true; clearTimeout(tTavs); saetTilstand("optager"); } };
+    if (!Gjenk) { visBesked("Siri findes ikke her; skriv kommentaren og tryk Slut."); return; }
     Lyt.formaal = "kommentar";
     Lyt.start(r => {
       const t = r.tekst; if (!t) return;
@@ -403,7 +426,7 @@ function lytKommentar() {
       if (varianter("slutord", "slut").includes(o)) return afslut(slutMed());
       if (alle.length <= 2 && VAR.gentag.includes(alle[alle.length - 1])) return afslut({ type: "gentag" });
       if (alle.length <= 2 && VAR.tilbage.includes(alle[alle.length - 1])) return afslut({ type: "tilbage" });
-    }, f => afslut({ type: "fejl", fejl: f }));
+    }, f => { visBesked(fejltekst(f) + " Du kan skrive kommentaren i feltet og trykke Slut.", true); });
   });
 }
 
@@ -434,9 +457,10 @@ async function lytOptag() {
     const afslut = (type) => {
       if (slut) return; slut = true; clearInterval(tik); S.slutNu = null; afbryd = null; Lyt.stop();
       const svar = () => {
-        if (type !== "kommentar" || !talt) return res({ type: type === "kommentar" ? "slut" : type });
-        const lyd = new Blob(dele, { type: mr.mimeType || "audio/mp4" });
-        res({ type: "kommentar", tekst: "", lyd, varighed: Math.round((sidstHoejt - t0) / 1000) });
+        const skrevet = $("skriv").value.trim();
+        if (type !== "kommentar" || (!talt && !skrevet)) return res({ type: type === "kommentar" ? "slut" : type });
+        const lyd = talt ? new Blob(dele, { type: mr.mimeType || "audio/mp4" }) : null;
+        res({ type: "kommentar", tekst: skrevet, lyd, varighed: talt ? Math.round((sidstHoejt - t0) / 1000) : null });
       };
       mr.onstop = svar;
       try { mr.stop(); } catch (e) { svar(); }
@@ -574,6 +598,8 @@ const ORD = { klar: "Klar", laeser: "Læser", bip: "Stop", lytter: "Tal nu", opt
 function saetTilstand(t) {
   S.t = t; $("tilstand").dataset.t = t; $("ord").textContent = t === "optager" && ind("modus") === "optag" ? "Optager" : (ORD[t] || t);
   if (t === "laeser") $("udskrift").textContent = "";
+  const skriv = $("skriv"), iKommentar = t === "lytter" || t === "optager";
+  skriv.hidden = !iKommentar; if (!iKommentar) skriv.value = "";
   knapper(t !== "klar" && t !== "faerdig");
 }
 function visBesked(t, fejl) { const b = $("besked"); b.textContent = t || ""; b.classList.toggle("fejl", !!fejl); }
@@ -596,10 +622,11 @@ const DB = {
   slet(id) { return this.kald("readwrite", st => st.delete(id)); },
 };
 async function gemKommentar(s, sted, r) {
-  const o = { rapport: S.meta.rapport, afsnit: s.afsnit, titel: s.titel, stykke: s.nr, linje: s.linje, tekst_start: s.kilde,
+  const o = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+              rapport: S.meta.rapport, afsnit: s.afsnit, titel: s.titel, stykke: s.nr, linje: s.linje, tekst_start: s.kilde,
               ord: sted.ord, ved: ordeneFoer(s, sted.ord), ms: sted.ms, stop_via: sted.via,
               kommentar: r.tekst || "", lyd: r.lyd || null, varighed: r.varighed || null,
-              modus: ind("modus"), tid: new Date().toISOString() };
+              modus: ind("modus"), tid: new Date().toISOString(), sendt: null, batch: null, svar: null };
   try { await DB.laeg(o); } catch (e) { visBesked("Kommentaren kunne ikke gemmes: " + e.message, true); }
   try { const k = JSON.parse(localStorage.getItem("kom_tekst") || "[]"); k.push({ ...o, lyd: !!o.lyd }); localStorage.setItem("kom_tekst", JSON.stringify(k)); } catch (e) {}
   visKommentarer();
@@ -615,15 +642,79 @@ async function visKommentarer() {
     top.textContent = "K" + (n + 1) + " · " + k.afsnit + " " + k.titel + " · " + tid.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
     const ved = document.createElement("div"); ved.className = "ved"; ved.textContent = k.ved ? "… " + k.ved : (k.tekst_slut ? k.tekst_slut.slice(0, 80) + " …" : "");
     const tekst = document.createElement("div");
-    tekst.textContent = k.kommentar || (k.lyd ? "Lydkommentar" + (k.varighed ? ", ca. " + k.varighed + " s" : "") : "(tom)");
+    tekst.textContent = (k.kommentar || "") + (k.lyd ? (k.kommentar ? " + " : "") + "lydkommentar" + (k.varighed ? ", ca. " + k.varighed + " s" : "") : "") || "(tom)";
+    const post = document.createElement("div"); post.className = "ved";
+    if (k.svar) {
+      post.textContent = (k.svar.status || "") + " " + (k.svar.o ? k.svar.o + " · " : "") + (k.svar.tekst || "");
+      if (k.svar.foer || k.svar.efter) post.textContent += " [" + (k.svar.foer || "…") + " → " + (k.svar.efter || "…") + "]";
+      post.style.color = k.svar.status === "✓" ? "var(--groen)" : k.svar.status === "✗" ? "var(--roed)" : "var(--gul)";
+    } else post.textContent = k.sendt ? "Sendt " + new Date(k.sendt).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" }) + " · venter på svar" : "Ikke sendt";
     const r = document.createElement("div"); r.className = "raekke";
     if (k.lyd) { const p = document.createElement("button"); p.textContent = "Afspil"; p.onclick = () => { stopAlt(); Lyt.stop(); saetTilstand("pause"); afsp.src = URL.createObjectURL(k.lyd); afsp.playbackRate = 1; afsp.play(); }; r.append(p); }
     const sl = document.createElement("button"); sl.textContent = "Slet";
     sl.onclick = async () => { if (sl.dataset.sikker) { await DB.slet(k.id); visKommentarer(); } else { sl.dataset.sikker = "1"; sl.textContent = "Tryk igen for at slette"; } };
     r.append(sl);
-    a.append(top, ved, tekst, r); liste.append(a);
+    a.append(top, ved, tekst, post, r); liste.append(a);
   });
+  const usendte = alle.filter(k => !k.sendt).length, besvarede = alle.filter(k => k.svar).length;
+  $("ret").textContent = "Ret kommentarer" + (usendte ? " (" + usendte + ")" : "");
+  $("poststatus").textContent = alle.length ? usendte + " usendte · " + (alle.length - usendte - besvarede) + " venter på svar · " + besvarede + " besvaret." :
+    "«Ret kommentarer» sender de usendte kommentarer til postkassen; rapporten rettes på pc'en, og svaret står under hver kommentar, når du trykker «Hent svar».";
   return alle;
+}
+
+/* ---------- postkassen: Ret kommentarer, Opdater lyden, Hent svar ---------- */
+async function githubPut(sti, bytes, besked) {
+  const [ejer, repo] = (ind("postrepo") || "austudie-tgs/oplaesning").split("/");
+  const r = await fetch("https://api.github.com/repos/" + ejer + "/" + repo + "/contents/" + sti, {
+    method: "PUT", headers: { Authorization: "Bearer " + ind("token"), Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+    body: JSON.stringify({ message: besked, content: b64(bytes) }) });
+  if (!r.ok) throw new Error("GitHub svarede " + r.status + (r.status === 401 || r.status === 403 || r.status === 404 ? ". Er tokenet rigtigt, og må det skrive i " + ejer + "/" + repo + "?" : ""));
+}
+const batchNavn = (p) => p + "_" + dato(new Date()) + "_" + Math.random().toString(36).slice(2, 6);
+async function lydB64(blob) { if (!blob || blob.size > 3e6) return null; return b64(new Uint8Array(await blob.arrayBuffer())); }
+async function retKommentarer() {
+  if (!ind("token")) return visBesked("Skriv GitHub-tokenet under Indstillinger først, eller brug «Del kommentarerne».", true);
+  let alle = []; try { alle = (await DB.alle()).filter(k => k.rapport === S.meta.rapport && !k.sendt); } catch (e) {}
+  if (!alle.length) return visBesked("Alle kommentarer er sendt.");
+  const navn = batchNavn("K"), ud = [];
+  for (const k of alle) ud.push({ id: k.id, afsnit: k.afsnit, titel: k.titel, linje: k.linje, stykke: k.stykke, tekst_start: k.tekst_start, ved: k.ved, ord: k.ord,
+                                  kommentar: k.kommentar || "", lyd: await lydB64(k.lyd), lyd_type: k.lyd ? k.lyd.type : null, tid: k.tid, modus: k.modus });
+  const json = JSON.stringify({ batch: navn, rapport: S.meta.rapport, kilde_sha: S.meta.kilde_sha, bygget: S.meta.bygget, sendt: new Date().toISOString(), kommentarer: ud });
+  $("ret").disabled = true; visBesked("Sender " + alle.length + " kommentarer …");
+  try {
+    await githubPut("post/ind/" + navn + ".bin", await krypter(new TextEncoder().encode(json)), "Kommentarer " + navn);
+    const nu = new Date().toISOString();
+    for (const k of alle) { k.sendt = nu; k.batch = navn; await DB.laeg(k); }
+    visBesked(alle.length + " kommentarer sendt. Postkassen på pc'en retter rapporten; tryk «Hent svar» om nogle minutter.");
+  } catch (e) { visBesked("Kunne ikke sende: " + e.message, true); }
+  $("ret").disabled = false; visKommentarer();
+}
+async function bygLyd() {
+  if (!ind("token")) return visBesked("Skriv GitHub-tokenet under Indstillinger først.", true);
+  const navn = batchNavn("B");
+  $("byglyd").disabled = true;
+  try {
+    await githubPut("post/ind/" + navn + "-byg.bin", await krypter(new TextEncoder().encode(JSON.stringify({ type: "byg", rapport: S.meta.rapport, tid: new Date().toISOString() }))), "Byg lyden " + navn);
+    visBesked("Lyden er bestilt. Den bygges på pc'en og ligger her om nogle minutter; genindlæs siden, og hent lyden til turen igen.");
+  } catch (e) { visBesked("Kunne ikke bestille: " + e.message, true); }
+  $("byglyd").disabled = false;
+}
+async function hentSvar(stille) {
+  // svarene ligger på siden selv (post/svar/<batch>.bin, krypteret med samme nøgle); intet token nødvendigt
+  let alle = []; try { alle = (await DB.alle()).filter(k => k.rapport === S.meta.rapport && k.sendt && !k.svar); } catch (e) {}
+  const batches = [...new Set(alle.map(k => k.batch).filter(Boolean))];
+  let nye = 0;
+  for (const b of batches) {
+    try {
+      const r = await fetch("post/svar/" + b + ".bin?v=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) continue;
+      const svar = JSON.parse(new TextDecoder().decode(await dekrypter(await r.arrayBuffer())));
+      for (const s of svar.svar || []) { const k = alle.find(x => x.id === s.id); if (k) { k.svar = s; await DB.laeg(k); nye++; } }
+    } catch (e) {}
+  }
+  if (!stille) visBesked(nye ? nye + " svar hentet." : batches.length ? "Ingen svar endnu. Postkassen kører hvert andet minut på pc'en, og siden har svaret et minut efter." : "Alt er besvaret.");
+  if (nye) visKommentarer();
 }
 const dato = d => { const p = n => String(n).padStart(2, "0"); return p(d.getFullYear() % 100) + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "_" + p(d.getHours()) + p(d.getMinutes()); };
 async function filer() {
@@ -631,9 +722,9 @@ async function filer() {
   const lyde = [], ud = alle.map((k, n) => {
     let navn = null;
     if (k.lyd) { const ext = (k.lyd.type || "").includes("webm") ? "webm" : "m4a"; navn = "Oplaesning_K" + String(n + 1).padStart(2, "0") + "_" + k.afsnit + "." + ext; lyde.push(new File([k.lyd], navn, { type: k.lyd.type || "audio/mp4" })); }
-    return { nr: "K" + (n + 1), afsnit: k.afsnit, titel: k.titel, linje: k.linje != null ? k.linje : k.linje_fra, stykke: k.stykke != null ? k.stykke : k.stykke_til,
+    return { nr: "K" + (n + 1), id: k.id, afsnit: k.afsnit, titel: k.titel, linje: k.linje != null ? k.linje : k.linje_fra, stykke: k.stykke != null ? k.stykke : k.stykke_til,
              tekst_start: k.tekst_start, ved: k.ved || k.tekst_slut || "", ord: k.ord, stop_via: k.stop_via,
-             kommentar: k.kommentar, lyd: navn, tid: k.tid, modus: k.modus };
+             kommentar: k.kommentar, lyd: navn, tid: k.tid, modus: k.modus, sendt: k.sendt || null, batch: k.batch || null, svar: k.svar || null };
   });
   const json = JSON.stringify({ rapport: S.meta.rapport, kilde_sha: S.meta.kilde_sha, bygget: S.meta.bygget, eksporteret: new Date().toISOString(),
                                 forklaring: "ved = de sidste ord, der var læst op, da der blev sagt stop; linje = linjen i Rapport vN.md; tekst_start = linjens begyndelse",
@@ -709,6 +800,10 @@ async function init() {
   $("hent").onclick = hentAlt;
   $("del").onclick = del;
   $("kopier").onclick = kopier;
+  $("ret").onclick = retKommentarer;
+  $("byglyd").onclick = bygLyd;
+  $("hentsvar").onclick = () => hentSvar(false);
+  $("kommentarer").addEventListener("toggle", () => { if ($("kommentarer").open) hentSvar(true); });
   afsp.addEventListener("pause", () => {
     if (S.egenPause || S.t !== "laeser" || afsp.ended) return;
     // lige efter at Siri er sat til at lytte, kan iPhonen selv sætte lyden på pause et øjeblik; så spilles der videre
@@ -736,7 +831,8 @@ async function init() {
   const udenTider = S.stykker.filter(s => !s.tider || !s.tider.length).length;
   $("byggeinfo").textContent = "Bygget " + S.meta.bygget + " af " + S.meta.rapport + " (" + S.stykker.length + " stykker, stemme Jeppe" + (udenTider ? ", " + udenTider + " uden ordtider" : "") + ").";
   byggAfsnitsliste();
-  visKommentarer();
+  await visKommentarer();
+  hentSvar(true);
 }
 function modusMaerke() {
   const m = (ind("modus") === "tale" ? (Gjenk ? "Tekst" : "Tekst (Siri findes ikke her)") : "Lyd") + (ind("lytstop") === "ja" && Gjenk ? " · lytter efter «" + (ind("stopord") || "stop") + "»" : " · knappen");
@@ -744,7 +840,7 @@ function modusMaerke() {
 }
 init();
 // til afprøvning uden mikrofon: OPL.simuler("stop") spiller en hørt sætning ind, som om Siri havde hørt den
-window.OPL = { S, Lyt, koer, stopSagt, simuler: (segment, tekst) => Lyt.onRes && Lyt.onRes({ tekst: tekst != null ? tekst : segment, segment, endelig: true }) };
+window.OPL = { S, Lyt, DB, koer, stopSagt, retKommentarer, hentSvar, simuler: (segment, tekst) => Lyt.onRes && Lyt.onRes({ tekst: tekst != null ? tekst : segment, segment, endelig: true }) };
 </script>
 </body>
 </html>
