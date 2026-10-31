@@ -38,6 +38,17 @@ h1 { font-size: 1.05rem; margin: 0; letter-spacing: .02em; }
 .fremdrift i { display: block; height: 100%; width: 0; background: var(--blaa); }
 .laesning { position: relative; background: var(--panel); border: 1px solid var(--linje); border-radius: 18px; padding: 14px 18px; font-size: 1.3rem; line-height: 1.55; max-height: 40vh; min-height: 5em; overflow: auto; scroll-behavior: smooth; }
 .laesning[hidden] { display: none; }
+/* mærket for kommentarer og ændringer ved stykket: lille, oppe i hjørnet; feltet under folder ud ved tryk eller mus */
+.laesning .maerke { position: sticky; top: 0; float: right; margin: -6px -8px 0 8px; font-size: .78rem; color: var(--svag); background: var(--panel); border: 1px solid var(--linje); border-radius: 10px; padding: 2px 8px; cursor: pointer; user-select: none; }
+.laesning .maerke.aendret { color: var(--groen); border-color: var(--groen); }
+.laesning .maerke[hidden] { display: none; }
+.aendring { background: var(--panel); border: 1px solid var(--groen); border-radius: 14px; padding: 10px 14px; font-size: .92rem; display: grid; gap: 8px; }
+.aendring[hidden] { display: none; }
+.aendring article { display: grid; gap: 3px; border-top: 1px solid var(--linje); padding-top: 6px; }
+.aendring article:first-child { border-top: 0; padding-top: 0; }
+.aendring .k { color: var(--svag); font-size: .85rem; }
+.aendring del { background: #3a1d1a; color: #ffb3ab; text-decoration: line-through; border-radius: 4px; padding: 0 2px; }
+.aendring ins { background: #163a25; color: #9fe6bb; text-decoration: none; border-radius: 4px; padding: 0 2px; }
 .laesning .o { color: var(--svag); border-radius: 6px; padding: 0 2px; }
 .laesning .o.laest { color: var(--tekst); }
 .laesning .o.nu { background: var(--gul); color: #1a1200; font-weight: 700; }
@@ -88,7 +99,8 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
     <input id="skriv" type="text" hidden placeholder="… eller skriv kommentaren her og tryk Slut" autocomplete="off">
   </section>
 
-  <section class="laesning" id="laesning" hidden></section>
+  <section class="laesning" id="laesning" hidden><span class="maerke" id="maerke" hidden></span><span id="ordene"></span></section>
+  <section class="aendring" id="aendring" hidden></section>
 
   <div class="knapper">
     <button id="tilbage" class="anden" disabled>Tilbage</button>
@@ -293,12 +305,13 @@ function visStykke(s) {
   const b = document.createElement("b"); b.textContent = s.afsnit + " " + s.titel;
   $("hvor").append(b, document.createTextNode(" · stykke " + pos + " af " + kap.length + " i kapitel " + s.kap));
   $("fremdrift").style.width = (100 * pos / kap.length) + "%";
-  const l = $("laesning"); l.innerHTML = ""; S.ordIdx = -1;
+  const l = $("laesning"), ordene = $("ordene"); ordene.innerHTML = ""; S.ordIdx = -1;
   l.hidden = ind("vistekst") !== "ja";
   s.tekst.split(/\s+/).forEach((o, k) => {
-    const e = document.createElement("span"); e.className = "o"; e.textContent = o; e.dataset.k = k; l.append(e, document.createTextNode(" "));
+    const e = document.createElement("span"); e.className = "o"; e.textContent = o; e.dataset.k = k; ordene.append(e, document.createTextNode(" "));
   });
   l.scrollTop = 0;
+  visMaerke(s);
 }
 function ordVed(s, ms) {
   const t = s.tider; if (!t || !t.length) return -1;
@@ -307,7 +320,7 @@ function ordVed(s, ms) {
   return t[lo] <= ms ? lo : -1;
 }
 function markerOrd(k, klasse) {
-  const l = $("laesning"), alle = l.children;
+  const l = $("laesning"), alle = $("ordene").children;
   if (S.ordIdx >= 0 && alle[S.ordIdx]) { alle[S.ordIdx].classList.remove("nu"); alle[S.ordIdx].classList.add("laest"); }
   for (let j = Math.max(0, S.ordIdx + 1); j < k; j++) if (alle[j]) alle[j].classList.add("laest");
   S.ordIdx = k;
@@ -337,6 +350,79 @@ function saetningStart(s, ord) {
   return t && t[k] ? Math.max(0, t[k] - 150) : 0;
 }
 function ordeneFoer(s, ord, n = 10) { const o = s.tekst.split(/\s+/); return o.slice(Math.max(0, ord - n + 1), ord + 1).join(" "); }
+
+/* ---------- kommentarerne ved stykket: mærket og feltet med ændringen ---------- */
+// Rettelserne står ikke i teksten; et lille mærke ved stykket viser, at der er kommenteret dér, og feltet under
+// folder ud ved tryk eller mus med kommentaren, svaret og ændringen (før → efter) siden sidste kommentarrettelse.
+S.kommVed = new Map();
+async function byggKommentarkort() {
+  S.kommVed = new Map();
+  let alle = []; try { alle = (await DB.alle()).filter(k => k.rapport === S.meta.rapport); } catch (e) {}
+  for (const k of alle) {
+    // stykket i samme afsnit med den linje, der ligger nærmest; linjerne flytter sig, når rapporten rettes, afsnittet bliver
+    let bedst = null, afstand = Infinity;
+    S.stykker.forEach(s => { if (s.afsnit !== k.afsnit) return; const d = Math.abs((s.linje || 0) - (k.linje || 0)); if (d < afstand) { afstand = d; bedst = s; } });
+    if (!bedst) continue;
+    if (!S.kommVed.has(bedst.nr)) S.kommVed.set(bedst.nr, []);
+    S.kommVed.get(bedst.nr).push(k);
+  }
+  const sidste = alle.slice().sort((a, b) => (a.tid > b.tid ? 1 : -1)).pop();
+  S.sidsteKommentar = sidste || null;
+  if (S.t !== "klar" && S.stykker[S.i]) visMaerke(S.stykker[S.i]);
+  markerAfsnit();
+}
+const erAendret = k => k.svar && (k.svar.status === "✓" || k.svar.status === "◐");
+function visMaerke(s) {
+  const m = $("maerke"), liste = S.kommVed.get(s.nr) || [];
+  $("aendring").hidden = true; S.aendringFast = false;
+  if (!liste.length) { m.hidden = true; return; }
+  const aendret = liste.some(erAendret), sidst = S.sidsteKommentar && liste.includes(S.sidsteKommentar);
+  m.textContent = (aendret ? "✎ " : "💬 ") + liste.length + (sidst ? " · sidste" : "");
+  m.classList.toggle("aendret", aendret);
+  m.title = aendret ? "Stykket er rettet efter en kommentar. Tryk for at se ændringen." : "Der er kommenteret her. Tryk for at se kommentaren.";
+  m.hidden = false;
+}
+function visAendring(s, vis) {
+  const a = $("aendring"); a.innerHTML = "";
+  const liste = S.kommVed.get(s.nr) || [];
+  if (!vis || !liste.length) { a.hidden = true; return; }
+  liste.slice().sort((x, y) => (x.tid > y.tid ? 1 : -1)).forEach(k => {
+    const art = document.createElement("article");
+    const top = document.createElement("div"); top.className = "k";
+    top.textContent = (k.svar ? k.svar.status + " " + (k.svar.o || "") + " · " : (k.sendt ? "sendt · " : "ikke sendt · ")) + new Date(k.tid).toLocaleString("da-DK", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + (k.ved ? " · ved «… " + k.ved + "»" : "");
+    const kom = document.createElement("div"); kom.textContent = "Du sagde: " + (k.kommentar || (k.lyd ? "(lydkommentar)" : "(tom)"));
+    art.append(top, kom);
+    if (k.svar) {
+      const sv = document.createElement("div"); sv.textContent = "Svar: " + (k.svar.tekst || ""); art.append(sv);
+      if (k.svar.foer || k.svar.efter) { const d = document.createElement("div"); d.innerHTML = ordDiff(k.svar.foer || "", k.svar.efter || ""); art.append(d); }
+    }
+    a.append(art);
+  });
+  a.hidden = false;
+}
+function ordDiff(foer, efter) {
+  // enkel orddiff (længste fælles delfølge): slettet som <del>, nyt som <ins>
+  const a = foer.split(/\s+/).filter(Boolean), b = efter.split(/\s+/).filter(Boolean);
+  if (a.length * b.length > 250000) return esc(foer) + " → " + esc(efter);
+  const L = Array.from({ length: a.length + 1 }, () => new Uint16Array(b.length + 1));
+  for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const ud = []; let i = 0, j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { ud.push(esc(a[i])); i++; j++; }
+    else if (L[i + 1][j] >= L[i][j + 1]) { ud.push("<del>" + esc(a[i]) + "</del>"); i++; }
+    else { ud.push("<ins>" + esc(b[j]) + "</ins>"); j++; }
+  }
+  while (i < a.length) ud.push("<del>" + esc(a[i++]) + "</del>");
+  while (j < b.length) ud.push("<ins>" + esc(b[j++]) + "</ins>");
+  return ud.join(" ");
+}
+const esc = t => t.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+function markerAfsnit() {
+  // afsnit med en rettelse får en prik i listen «Start fra»
+  const aendrede = new Set();
+  for (const [nr, liste] of S.kommVed) { const s = S.stykker.find(x => x.nr === nr); if (s && liste.some(erAendret)) aendrede.add(s.afsnit); }
+  for (const o of $("afsnit").options) { const t = o.textContent.replace(/ ·$/, ""); const afs = t.split(" ")[0]; o.textContent = aendrede.has(afs) && !t.startsWith("Fortsæt") ? t + " ·" : t; }
+}
 
 /* ---------- lytning: Siri ---------- */
 const Gjenk = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -656,6 +742,7 @@ async function visKommentarer() {
     r.append(sl);
     a.append(top, ved, tekst, post, r); liste.append(a);
   });
+  byggKommentarkort();
   const usendte = alle.filter(k => !k.sendt).length, besvarede = alle.filter(k => k.svar).length;
   $("ret").textContent = "Ret kommentarer" + (usendte ? " (" + usendte + ")" : "");
   $("poststatus").textContent = alle.length ? usendte + " usendte · " + (alle.length - usendte - besvarede) + " venter på svar · " + besvarede + " besvaret." :
@@ -803,6 +890,9 @@ async function init() {
   $("ret").onclick = retKommentarer;
   $("byglyd").onclick = bygLyd;
   $("hentsvar").onclick = () => hentSvar(false);
+  $("maerke").onclick = () => { const s = S.stykker[S.i]; S.aendringFast = $("aendring").hidden; visAendring(s, S.aendringFast); };
+  $("maerke").onmouseenter = () => { if ($("aendring").hidden) visAendring(S.stykker[S.i], true); };
+  $("aendring").onmouseleave = () => { if (!S.aendringFast) visAendring(S.stykker[S.i], false); };
   $("kommentarer").addEventListener("toggle", () => { if ($("kommentarer").open) hentSvar(true); });
   afsp.addEventListener("pause", () => {
     if (S.egenPause || S.t !== "laeser" || afsp.ended) return;
@@ -840,7 +930,7 @@ function modusMaerke() {
 }
 init();
 // til afprøvning uden mikrofon: OPL.simuler("stop") spiller en hørt sætning ind, som om Siri havde hørt den
-window.OPL = { S, Lyt, DB, koer, stopSagt, retKommentarer, hentSvar, simuler: (segment, tekst) => Lyt.onRes && Lyt.onRes({ tekst: tekst != null ? tekst : segment, segment, endelig: true }) };
+window.OPL = { S, Lyt, DB, koer, stopSagt, retKommentarer, hentSvar, byggKommentarkort, visKommentarer, simuler: (segment, tekst) => Lyt.onRes && Lyt.onRes({ tekst: tekst != null ? tekst : segment, segment, endelig: true }) };
 </script>
 </body>
 </html>
