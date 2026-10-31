@@ -53,7 +53,8 @@ h1 { font-size: 1.05rem; margin: 0; letter-spacing: .02em; }
 .laesning .o.laest { color: var(--tekst); }
 .laesning .o.nu { background: var(--gul); color: #1a1200; font-weight: 700; }
 .laesning .o.stop { background: var(--roed); color: #fff; font-weight: 700; }
-.knapper { display: grid; grid-template-columns: 1fr 1.6fr 1fr; gap: 10px; }
+.knapper { display: grid; grid-template-columns: 1fr .85fr 1.5fr .85fr 1fr; gap: 6px; }
+.knapper button.anden { padding: 12px 4px; font-size: .95rem; }
 button, select, input { font: inherit; color: inherit; }
 button { background: var(--panel); border: 1px solid var(--linje); border-radius: 14px; padding: 12px 10px; min-height: 64px; font-weight: 700; cursor: pointer; }
 button:active { transform: scale(.98); }
@@ -103,12 +104,15 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
   <section class="aendring" id="aendring" hidden></section>
 
   <div class="knapper">
-    <button id="tilbage" class="anden" disabled>Tilbage</button>
+    <button id="tilbage" class="anden" disabled title="Forrige afsnit">Forrige</button>
+    <button id="spoltilbage" class="anden" disabled title="5 sekunder tilbage">−5 s</button>
     <button id="start" class="hoved">Start</button>
-    <button id="naeste" class="anden" disabled>Næste</button>
+    <button id="spolfrem" class="anden" disabled title="5 sekunder frem">+5 s</button>
+    <button id="naeste" class="anden" disabled title="Næste afsnit">Næste</button>
   </div>
   <div class="raekke">
     <button id="gentag" class="anden" disabled>Gentag</button>
+    <button id="kommentarknap" class="anden" disabled>Kommentér</button>
     <button id="test" class="anden">Test lytning</button>
   </div>
 
@@ -184,7 +188,7 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
         <input id="postrepo" type="text" value="austudie-tgs/oplaesning" autocomplete="off" autocapitalize="off">
       </label>
     </div>
-    <p class="lille">Sig «stop», når du vil kommentere: oplæsningen stopper, ordet markeres med rødt, og det, du siger, skrives ned, til du siger «slut». Så gemmes kommentaren ved det ord, og oplæsningen fortsætter fra sætningens begyndelse. Knappen midtfor gør det samme (Stop, så Slut), og det gør rattets pause og play også. «Gentag» eller «tilbage» alene efter stop går tilbage uden kommentar; «slut» uden ord læser bare videre. I pause: sig «fortsæt» eller tryk Fortsæt.</p>
+    <p class="lille">Sig «stop», når du vil kommentere: oplæsningen stopper, ordet markeres med rødt, og det, du siger, skrives ned, til du siger «slut». Så gemmes kommentaren ved det ord, og oplæsningen fortsætter fra sætningens begyndelse. Knappen Kommentér gør det samme som «stop», og knappen midtfor bliver Slut, mens du taler. Rattets pause og play virker som «stop» og «slut». «Gentag» eller «tilbage» alene efter stop går tilbage uden kommentar; «slut» uden ord læser bare videre. Pause midtfor holder bare en pause; sig «fortsæt» eller tryk Fortsæt. −5 s og +5 s spoler i stykket. Kommentaren kræver «Tekst (Siri skriver ned)» ovenfor; med «Lyd» optages den kun. Skal mikrofonen ikke godkendes hver gang, så i Safari: aA i adresselinjen, Webstedsindstillinger, Mikrofon, Tillad.</p>
     <p class="lille" id="byggeinfo"></p>
   </details>
 </main>
@@ -205,12 +209,15 @@ const IND = ["modus", "lytstop", "stopord", "slutord", "tavs", "stille", "hvile"
 function laesInd() {
   try {
     const o = JSON.parse(localStorage.getItem("ind") || "{}");
-    // før 31-10-26 (_v 2) hed slutordet «næste», og stille/vent styrede bip-vinduet; de gamle værdier passer ikke
-    if (o._v !== 3) { delete o.slutord; delete o.stille; delete o.vistekst; }
+    // før 31-10-26 (_v 2) hed slutordet «næste», og stille/vent styrede bip-vinduet; de gamle værdier passer ikke.
+    // «Optag lyd» var dengang et nødvalg, når Siri fejlede; fra _v 4 er standarden tekst igen (ellers skrives
+    // kommentaren ikke ned, og mikrofonen skal godkendes hver gang)
+    if (o._v !== 3 && o._v !== 4) { delete o.slutord; delete o.stille; delete o.vistekst; }
+    if (o._v !== 4) delete o.modus;
     IND.forEach(k => { if (o[k] != null) $(k).value = o[k]; });
   } catch (e) {}
 }
-function gemInd() { try { const o = { _v: 3 }; IND.forEach(k => o[k] = $(k).value); localStorage.setItem("ind", JSON.stringify(o)); } catch (e) {} }
+function gemInd() { try { const o = { _v: 4 }; IND.forEach(k => o[k] = $(k).value); localStorage.setItem("ind", JSON.stringify(o)); } catch (e) {} }
 const ind = k => $(k).value;
 const tal = k => parseFloat($(k).value) || 0;
 
@@ -435,11 +442,19 @@ const sidsteOrd = t => { const o = rens(t).split(" "); return o[o.length - 1] ||
 const fjernSidst = (t, ord) => t.replace(new RegExp("([\\s,.]*\\b(" + ord.join("|") + ")\\b[\\s.!?]*)+$", "i"), "").trim();
 
 const Lyt = {
-  rec: null, aktiv: false, grund: "", fin: "", mid: "", onRes: null, onFejl: null, korte: 0, t0: 0,
+  rec: null, aktiv: false, grund: "", fin: "", mid: "", onRes: null, onFejl: null, korte: 0, t0: 0, fra: 0, antal: 0,
   start(onRes, onFejl) {
-    this.stop(); this.grund = this.fin = this.mid = ""; this.onRes = onRes; this.onFejl = onFejl; this.aktiv = true; this.korte = 0;
+    this.stop(); this.grund = this.fin = this.mid = ""; this.fra = this.antal = 0; this.onRes = onRes; this.onFejl = onFejl; this.aktiv = true; this.korte = 0;
     try { this.ny(); } catch (e) { this.stop(); onFejl && onFejl(String(e)); }
   },
+  // samme lyttesession, ny lytter: alt, der er hørt før nu, ignoreres. iPhonen taber gerne en session, der
+  // startes lige efter en anden er afbrudt, så skiftet fra «lyt efter stop» til «skriv kommentaren ned» sker uden ny session.
+  skift(onRes, onFejl) {
+    if (!this.aktiv || !this.rec) return false;
+    this.grund = this.fin = this.mid = ""; this.fra = this.antal; this.onRes = onRes; this.onFejl = onFejl; this.korte = 0;
+    return true;
+  },
+  lyt(onRes, onFejl) { if (!this.skift(onRes, onFejl)) this.start(onRes, onFejl); },
   stop() {
     this.aktiv = false; const r = this.rec; this.rec = null;
     if (r) { r.onresult = r.onend = r.onerror = null; try { r.abort(); } catch (e) {} }
@@ -452,7 +467,8 @@ const Lyt = {
     r.onresult = e => {
       if (r !== this.rec) return;
       let fin = "", mid = "";
-      for (let k = 0; k < e.results.length; k++) { const x = e.results[k]; if (x.isFinal) fin += x[0].transcript + " "; else mid += x[0].transcript + " "; }
+      for (let k = this.fra; k < e.results.length; k++) { const x = e.results[k]; if (x.isFinal) fin += x[0].transcript + " "; else mid += x[0].transcript + " "; }
+      this.antal = e.results.length;
       this.fin = fin.trim(); this.mid = mid.trim();
       const sidst = e.results[e.results.length - 1];
       this.onRes && this.onRes({ tekst: this.tekst(), segment: (sidst && sidst[0].transcript) || "", endelig: !!(sidst && sidst.isFinal) });
@@ -464,7 +480,7 @@ const Lyt = {
     };
     r.onend = () => {
       if (r !== this.rec || !this.aktiv) return;
-      this.grund = (this.grund + " " + this.fin).trim(); this.fin = ""; this.mid = "";
+      this.grund = (this.grund + " " + this.fin).trim(); this.fin = ""; this.mid = ""; this.fra = this.antal = 0;
       this.korte = Date.now() - this.t0 < 1500 ? this.korte + 1 : 0;
       if (this.korte >= 6) { this.stop(); this.onFejl && this.onFejl("genstart"); return; }
       setTimeout(() => { if (this.aktiv && r === this.rec) { try { this.ny(); } catch (e) { this.stop(); this.onFejl && this.onFejl(String(e)); } } }, 150);
@@ -477,7 +493,7 @@ function lytEfterStop() {
   if (ind("lytstop") !== "ja" || !Gjenk) return;
   if (Lyt.aktiv && Lyt.formaal === "stop") return;
   Lyt.formaal = "stop";
-  Lyt.start(r => {
+  Lyt.lyt(r => {
     if (S.t !== "laeser") return;
     const o = sidsteOrd(r.segment);
     if (!varianter("stopord", "stop").includes(o)) return;
@@ -492,9 +508,15 @@ function lytKommentar() {
   return new Promise(res => {
     let slut = false, tTavs = null, tMax = null, talt = false, hoert = "";
     const skriv = $("skriv");
-    const afslut = r => { if (slut) return; slut = true; clearTimeout(tTavs); clearTimeout(tMax); S.slutNu = null; afbryd = null; skriv.oninput = null; Lyt.stop(); res(r); };
+    // lyttesessionen bliver stående til næste fase (oplæsningen skifter den til «lyt efter stop»)
+    const afslut = r => { if (slut) return; slut = true; clearTimeout(tTavs); clearTimeout(tMax); S.slutNu = null; afbryd = null; skriv.oninput = null; res(r); };
     // det skrevne gælder frem for det hørte, så kommentaren også kan skrives på pc'en eller rettes, før den gemmes
-    const slutMed = () => { const t = skriv.value.trim() || fjernSidst(hoert, varianter("slutord", "slut").concat(varianter("stopord", "stop"))); return t ? { type: "kommentar", tekst: t } : { type: "slut" }; };
+    const stopOrd = varianter("stopord", "stop");
+    const slutMed = () => {
+      let t = skriv.value.trim() || fjernSidst(hoert, varianter("slutord", "slut").concat(stopOrd));
+      t = t.replace(new RegExp("^(" + stopOrd.join("|") + ")\\b[\\s,.]*", "i"), "").trim();
+      return t ? { type: "kommentar", tekst: t } : { type: "slut" };
+    };
     afbryd = () => afslut({ type: "afbrudt" });
     S.slutNu = () => afslut(slutMed());
     const tavs = tal("tavs") || 30;
@@ -503,7 +525,7 @@ function lytKommentar() {
     skriv.oninput = () => { if (!talt) { talt = true; clearTimeout(tTavs); saetTilstand("optager"); } };
     if (!Gjenk) { visBesked("Siri findes ikke her; skriv kommentaren og tryk Slut."); return; }
     Lyt.formaal = "kommentar";
-    Lyt.start(r => {
+    Lyt.lyt(r => {
       const t = r.tekst; if (!t) return;
       hoert = t;
       if (!talt) { talt = true; clearTimeout(tTavs); saetTilstand("optager"); }
@@ -603,7 +625,7 @@ async function stopSagt(via) {
   if (S.t !== "laeser") return;
   const s = S.stykker[S.i], ms = Math.round(afsp.currentTime * 1000);
   const ord = S.ordIdx >= 0 ? S.ordIdx : Math.max(0, ordVed(s, ms));
-  stopAlt(); Lyt.stop();
+  stopAlt();  // lytningen bliver stående; kommentaren skifter den
   S.sted = { i: S.i, nr: s.nr, ms, ord, via };
   markerOrd(ord, "stop");
   saetTilstand("bip");
@@ -644,23 +666,34 @@ function fejltekst(f) {
 let pauseLyt = 0;
 async function pause(ms) {
   if (S.t === "laeser") ms = afsp.currentTime * 1000;
-  stopAlt(); Lyt.stop();
+  stopAlt();
   S.pauseMs = ms || 0;
   saetTilstand("pause"); knapper(true);
   if (ind("lytstop") === "ja" && Gjenk) {
     // i pause lyttes der efter «fortsæt» og slutordet i to minutter; derefter er det knappen
     const mit = ++pauseLyt;
     Lyt.formaal = "pause";
-    Lyt.start(r => { if (S.t !== "pause" || mit !== pauseLyt) return; const o = sidsteOrd(r.segment); if (VAR.fortsaet.includes(o) || varianter("slutord", "slut").includes(o)) startKnap(); }, () => {});
+    Lyt.lyt(r => { if (S.t !== "pause" || mit !== pauseLyt) return; const o = sidsteOrd(r.segment); if (VAR.fortsaet.includes(o) || varianter("slutord", "slut").includes(o)) startKnap(); }, () => {});
     setTimeout(() => { if (mit === pauseLyt && S.t === "pause" && Lyt.formaal === "pause") Lyt.stop(); }, 120000);
-  }
+  } else Lyt.stop();
 }
 function knapper(i_gang) {
   ["tilbage", "naeste", "gentag"].forEach(k => $(k).disabled = !i_gang);
+  $("kommentarknap").disabled = S.t !== "laeser";
+  ["spoltilbage", "spolfrem"].forEach(k => $(k).disabled = !(S.t === "laeser" || S.t === "pause"));
   const b = $("start");
-  const k = S.t === "pause" ? "fortsaet" : (S.t === "klar" || S.t === "faerdig") ? "start" : (S.t === "lytter" || S.t === "optager") ? "slut" : "stop";
+  const k = S.t === "pause" ? "fortsaet" : (S.t === "klar" || S.t === "faerdig") ? "start" : (S.t === "lytter" || S.t === "optager") ? "slut" : "pause";
   b.dataset.k = k;
-  b.textContent = { fortsaet: "Fortsæt", start: "Start", slut: "Slut", stop: "Stop" }[k];
+  b.textContent = { fortsaet: "Fortsæt", start: "Start", slut: "Slut", pause: "Pause" }[k];
+}
+function spol(sek) {
+  // 5 sekunder frem eller tilbage i stykket; i pause flyttes det sted, der fortsættes fra
+  if (S.t === "laeser") {
+    const slut = isFinite(afsp.duration) ? afsp.duration - 0.2 : Infinity;
+    afsp.currentTime = Math.max(0, Math.min(slut, afsp.currentTime + sek));
+    const s = S.stykker[S.i], k = ordVed(s, afsp.currentTime * 1000);
+    if (k >= 0) { $("ordene").querySelectorAll(".o.nu, .o.laest").forEach(e => e.classList.remove("nu", "laest")); S.ordIdx = -1; markerOrd(k); }
+  } else if (S.t === "pause") S.pauseMs = Math.max(0, S.pauseMs + sek * 1000);
 }
 async function startKnap() {
   if (S.t === "klar" || S.t === "faerdig") {
@@ -672,7 +705,7 @@ async function startKnap() {
     koer(nyt ? (parseInt($("afsnit").value, 10) || 0) : S.i, nyt ? 0 : S.pauseMs);
   } else if (S.t === "lytter" || S.t === "optager") {
     if (S.slutNu) S.slutNu();
-  } else if (S.t === "laeser") stopSagt("knap");
+  } else if (S.t === "laeser") pause();
 }
 async function laasLydOp() {
   try { if (S.ac && S.ac.state === "suspended") await S.ac.resume(); } catch (e) {}
@@ -883,6 +916,9 @@ async function init() {
   $("naeste").onclick = () => { let j = S.i; while (j < S.stykker.length - 1 && !S.stykker[j].stop) j++; koer(Math.min(S.stykker.length - 1, j + 1)); };
   $("tilbage").onclick = () => koer(gruppeStart(Math.max(0, gruppeStart(S.i) - 1)));
   $("gentag").onclick = () => koer(gruppeStart(S.i));
+  $("kommentarknap").onclick = () => { if (S.t === "laeser") stopSagt("knap"); };
+  $("spoltilbage").onclick = () => spol(-5);
+  $("spolfrem").onclick = () => spol(5);
   $("test").onclick = test;
   $("hent").onclick = hentAlt;
   $("del").onclick = del;
@@ -897,8 +933,9 @@ async function init() {
   afsp.addEventListener("pause", () => {
     if (S.egenPause || S.t !== "laeser" || afsp.ended) return;
     // lige efter at Siri er sat til at lytte, kan iPhonen selv sætte lyden på pause et øjeblik; så spilles der videre
-    if (Date.now() - S.lytStartet < 1200) { const p = afsp.play(); if (p) p.catch(() => stopSagt("knap")); return; }
-    stopSagt("knap");
+    if (Date.now() - S.lytStartet < 1200) { const p = afsp.play(); if (p) p.catch(() => pause()); return; }
+    // en afbrydelse udefra (opkald, en anden app) er en pause, ikke en kommentar; rattets pauseknap går gennem mediaSession
+    pause();
   });
   if ("mediaSession" in navigator) {
     const ms = navigator.mediaSession, h = (a, f) => { try { ms.setActionHandler(a, f); } catch (e) {} };
