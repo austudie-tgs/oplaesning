@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
 <style>
-/* Instrumentbræt om natten: én stor tilstand midt på skærmen, store knapper under, resten foldet ind. */
+/* Instrumentbræt om natten: én stor tilstand øverst, teksten der læses op under den, store knapper, resten foldet ind. */
 :root {
   --bg: #0d1117; --panel: #161c25; --linje: #263040; --tekst: #e8edf4; --svag: #8b97a8;
   --gul: #f2b33d; --roed: #ef5a4c; --groen: #47c27d; --blaa: #6aa6ff;
@@ -24,26 +24,32 @@ main { max-width: 640px; margin: 0 auto; display: grid; gap: 14px; }
 header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 h1 { font-size: 1.05rem; margin: 0; letter-spacing: .02em; }
 .lille { font-size: .82rem; color: var(--svag); }
-.tilstand { background: var(--panel); border: 2px solid var(--linje); border-radius: 18px; padding: 20px 18px; display: grid; gap: 8px; min-height: 210px; align-content: start; transition: border-color .2s; }
-.tilstand .ord { font-size: 3rem; font-weight: 700; line-height: 1.05; letter-spacing: -.01em; }
-.tilstand .hvor { font-size: 1.1rem; color: var(--svag); }
+.tilstand { background: var(--panel); border: 2px solid var(--linje); border-radius: 18px; padding: 16px 18px; display: grid; gap: 8px; align-content: start; transition: border-color .2s; }
+.tilstand .ord { font-size: 2.6rem; font-weight: 700; line-height: 1.05; letter-spacing: -.01em; }
+.tilstand .hvor { font-size: 1.05rem; color: var(--svag); }
 .tilstand .hvor b { color: var(--tekst); }
 .tilstand[data-t="lytter"] { border-color: var(--gul); } .tilstand[data-t="lytter"] .ord { color: var(--gul); }
 .tilstand[data-t="optager"] { border-color: var(--roed); } .tilstand[data-t="optager"] .ord { color: var(--roed); }
 .tilstand[data-t="gemt"] { border-color: var(--groen); } .tilstand[data-t="gemt"] .ord { color: var(--groen); }
 .tilstand[data-t="pause"] .ord, .tilstand[data-t="klar"] .ord { color: var(--blaa); }
-.udskrift { font-size: 1.15rem; min-height: 1.4em; color: var(--tekst); }
+.udskrift { font-size: 1.2rem; min-height: 1.4em; color: var(--tekst); }
 .udskrift:empty { display: none; }
-.stykke { font-size: .95rem; color: var(--svag); max-height: 9.5em; overflow: auto; border-top: 1px solid var(--linje); padding-top: 8px; }
-.stykke:empty { display: none; }
 .fremdrift { height: 6px; background: var(--linje); border-radius: 3px; overflow: hidden; }
 .fremdrift i { display: block; height: 100%; width: 0; background: var(--blaa); }
+.laesning { position: relative; background: var(--panel); border: 1px solid var(--linje); border-radius: 18px; padding: 14px 18px; font-size: 1.3rem; line-height: 1.55; max-height: 40vh; min-height: 5em; overflow: auto; scroll-behavior: smooth; }
+.laesning[hidden] { display: none; }
+.laesning .o { color: var(--svag); border-radius: 6px; padding: 0 2px; }
+.laesning .o.laest { color: var(--tekst); }
+.laesning .o.nu { background: var(--gul); color: #1a1200; font-weight: 700; }
+.laesning .o.stop { background: var(--roed); color: #fff; font-weight: 700; }
 .knapper { display: grid; grid-template-columns: 1fr 1.6fr 1fr; gap: 10px; }
 button, select, input { font: inherit; color: inherit; }
 button { background: var(--panel); border: 1px solid var(--linje); border-radius: 14px; padding: 12px 10px; min-height: 64px; font-weight: 700; cursor: pointer; }
 button:active { transform: scale(.98); }
 button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--blaa); outline-offset: 2px; }
 button.hoved { background: var(--blaa); color: #08111f; border-color: var(--blaa); font-size: 1.3rem; }
+button.hoved[data-k="stop"] { background: var(--gul); border-color: var(--gul); }
+button.hoved[data-k="slut"] { background: var(--groen); border-color: var(--groen); }
 button.anden { min-height: 48px; font-weight: 400; }
 button:disabled { opacity: .45; }
 .raekke { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -57,11 +63,12 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
 .kom { display: grid; gap: 8px; margin-top: 8px; }
 .kom article { border-top: 1px solid var(--linje); padding-top: 8px; display: grid; gap: 4px; }
 .kom article .top { display: flex; justify-content: space-between; gap: 8px; font-size: .85rem; color: var(--svag); }
+.kom article .ved { font-size: .85rem; color: var(--svag); font-style: italic; }
 .kom article button { min-height: 36px; padding: 4px 10px; font-weight: 400; font-size: .85rem; }
 .besked { background: #2a2210; border: 1px solid var(--gul); color: var(--gul); border-radius: 12px; padding: 10px 12px; font-size: .92rem; }
 .besked:empty { display: none; }
 .fejl { background: #2a1412; border-color: var(--roed); color: #ffb3ab; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
 </style>
 </head>
 <body>
@@ -78,8 +85,9 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
     <div class="hvor" id="hvor">Vælg, hvor du vil starte, og tryk Start.</div>
     <div class="fremdrift" aria-hidden="true"><i id="fremdrift"></i></div>
     <div class="udskrift" id="udskrift"></div>
-    <div class="stykke" id="stykketekst"></div>
   </section>
+
+  <section class="laesning" id="laesning" hidden></section>
 
   <div class="knapper">
     <button id="tilbage" class="anden" disabled>Tilbage</button>
@@ -115,22 +123,28 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
   <details>
     <summary>Indstillinger</summary>
     <div class="felter">
-      <label for="modus">Lytning
+      <label for="modus">Kommentaren gemmes som
         <select id="modus">
-          <option value="tale">Tale til tekst (Siri)</option>
-          <option value="optag">Optag lyd</option>
+          <option value="tale">Tekst (Siri skriver ned)</option>
+          <option value="optag">Lyd (optagelse)</option>
         </select>
       </label>
-      <label for="slutord">Slutord (afslutter kommentaren)
-        <input id="slutord" type="text" value="næste" autocomplete="off" autocapitalize="off">
+      <label for="lytstop">Lyt efter stopordet under oplæsningen
+        <select id="lytstop"><option value="ja">Ja</option><option value="nej">Nej, kun knappen</option></select>
       </label>
-      <label for="vent">Sekunder til at begynde at tale
-        <input id="vent" type="number" min="2" max="15" step="0.5" value="4">
+      <label for="stopord">Stopord (oplæsningen stopper, kommentaren begynder)
+        <input id="stopord" type="text" value="stop" autocomplete="off" autocapitalize="off">
       </label>
-      <label for="stille">Sekunders stilhed, før kommentaren gemmes
-        <input id="stille" type="number" min="1.5" max="15" step="0.5" value="6">
+      <label for="slutord">Slutord (kommentaren gemmes, oplæsningen fortsætter)
+        <input id="slutord" type="text" value="slut" autocomplete="off" autocapitalize="off">
       </label>
-      <label for="hvile">Sekunder fra lytning til oplæsning
+      <label for="tavs">Sekunder uden ord efter stop, før det bliver en pause
+        <input id="tavs" type="number" min="5" max="120" step="5" value="30">
+      </label>
+      <label for="stille">Lyd: sekunders stilhed, før optagelsen gemmes (0 = kun slutordet eller knappen)
+        <input id="stille" type="number" min="0" max="60" step="1" value="10">
+      </label>
+      <label for="hvile">Sekunder fra kommentar til oplæsning
         <input id="hvile" type="number" min="0" max="5" step="0.5" value="1.5">
       </label>
       <label for="tempo">Tempo (Jeppe er allerede 10 % hurtigere)
@@ -142,10 +156,10 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
         </select>
       </label>
       <label for="vistekst">Vis teksten, der læses op
-        <select id="vistekst"><option value="nej">Nej</option><option value="ja">Ja</option></select>
+        <select id="vistekst"><option value="ja" selected>Ja, ord for ord</option><option value="nej">Nej</option></select>
       </label>
     </div>
-    <p class="lille">Med Tale til tekst: sig «gentag», «tilbage» eller «pause» ved bippet, og «næste» alene for at gå videre uden kommentar. I pause: sig «fortsæt». Med Optag lyd gemmes kommentaren, når du har været stille, og kommandoerne virker ikke. Rattets knapper kan altid sætte på pause og fortsætte.</p>
+    <p class="lille">Sig «stop», når du vil kommentere: oplæsningen stopper, ordet markeres med rødt, og det, du siger, skrives ned, til du siger «slut». Så gemmes kommentaren ved det ord, og oplæsningen fortsætter fra sætningens begyndelse. Knappen midtfor gør det samme (Stop, så Slut), og det gør rattets pause og play også. «Gentag» eller «tilbage» alene efter stop går tilbage uden kommentar; «slut» uden ord læser bare videre. I pause: sig «fortsæt» eller tryk Fortsæt.</p>
     <p class="lille" id="byggeinfo"></p>
   </details>
 </main>
@@ -157,19 +171,21 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
 const $ = id => document.getElementById(id);
 const afsp = $("afsp");
 const S = { stykker: [], meta: {}, i: 0, t: "klar", noegle: null, cache: null, urls: new Map(),
-            strom: null, ac: null, analysator: null, egenPause: false, laas: null, lytterPause: false };
+            strom: null, ac: null, analysator: null, egenPause: false, laas: null,
+            ordIdx: -1, sted: null, slutNu: null, nytValg: false, pauseMs: 0, lytStartet: 0 };
 let koersel = 0, afbryd = null;
 
 /* ---------- indstillinger ---------- */
-const IND = ["modus", "slutord", "vent", "stille", "hvile", "tempo", "vistekst"];
+const IND = ["modus", "lytstop", "stopord", "slutord", "tavs", "stille", "hvile", "tempo", "vistekst"];
 function laesInd() {
   try {
     const o = JSON.parse(localStorage.getItem("ind") || "{}");
-    if (!o._v && o.stille === "4") o.stille = "6";  // standarden var 4 s før 25-10-26 kl. 21
+    // før 31-10-26 (_v 2) hed slutordet «næste», og stille/vent styrede bip-vinduet; de gamle værdier passer ikke
+    if (o._v !== 3) { delete o.slutord; delete o.stille; delete o.vistekst; }
     IND.forEach(k => { if (o[k] != null) $(k).value = o[k]; });
   } catch (e) {}
 }
-function gemInd() { try { const o = { _v: 2 }; IND.forEach(k => o[k] = $(k).value); localStorage.setItem("ind", JSON.stringify(o)); } catch (e) {} }
+function gemInd() { try { const o = { _v: 3 }; IND.forEach(k => o[k] = $(k).value); localStorage.setItem("ind", JSON.stringify(o)); } catch (e) {} }
 const ind = k => $(k).value;
 const tal = k => parseFloat($(k).value) || 0;
 
@@ -192,7 +208,7 @@ function wav(dele, sr = 24000) {
   return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
 }
 const BIP = {
-  tal: wav([[0, 0.12], [880, 0.75], [0, 0.08]]),
+  tal: wav([[0, 0.08], [880, 0.3], [0, 0.06]]),
   gemt: wav([[1175, 0.11], [0, 0.07], [1568, 0.16], [0, 0.1]]),
   fejl: wav([[330, 0.35], [0, 0.1]]),
 };
@@ -229,7 +245,7 @@ async function lydUrl(s) {
 function forhaand(i) { for (let j = i + 1; j < Math.min(S.stykker.length, i + 4); j++) lydUrl(S.stykker[j]).catch(() => {}); }
 
 /* ---------- afspilning ---------- */
-function spil(url, hastighed) {
+function spil(url, hastighed, fraMs = 0, foelgOrd = false) {
   return new Promise(res => {
     let slut = false;
     const faerdig = ok => { if (slut) return; slut = true; afsp.onended = afsp.onerror = null; res(ok); };
@@ -239,64 +255,155 @@ function spil(url, hastighed) {
     afsp.src = url;
     afsp.playbackRate = hastighed;
     afsp.defaultPlaybackRate = hastighed;
+    if (fraMs > 0) {
+      const saet = () => { try { afsp.currentTime = fraMs / 1000; } catch (e) {} };
+      afsp.addEventListener("loadedmetadata", saet, { once: true });
+      saet();
+    }
     const p = afsp.play();
-    if (p) p.catch(e => { visBesked("Lyden kunne ikke spille (" + e.name + "). Tryk Fortsæt.", true); faerdig(false); });
+    if (p) p.then(() => { if (foelgOrd) foelg(); }).catch(e => { visBesked("Lyden kunne ikke spille (" + e.name + "). Tryk Fortsæt.", true); faerdig(false); });
   });
 }
 function stopLyd() { S.egenPause = true; try { afsp.pause(); } catch (e) {} S.egenPause = false; }
 function stopAlt() { koersel++; if (afbryd) { const f = afbryd; afbryd = null; f(); } stopLyd(); }
 
-/* ---------- lytning: tale til tekst ---------- */
-const Gjenk = window.SpeechRecognition || window.webkitSpeechRecognition;
-const rens = t => t.toLowerCase().replace(/[.,!?;:«»"]/g, "").replace(/\s+/g, " ").trim();
-const KOMMANDO = { "gentag": "gentag", "tilbage": "tilbage", "pause": "pause", "stop": "pause", "fortsæt": "fortsaet" };
-// Siri hører «næste» som fx «heste» eller «bedste». De sikre varianter afslutter kommentaren;
-// «bedste» er et almindeligt ord og fjernes kun, når det står sidst i en kommentar, der er sluttet af stilhed.
-const varianter = s => s === "næste" ? { slut: ["næste", "neste", "næst", "nest", "heste"], fjern: ["bedste"] } : { slut: [s], fjern: [] };
-const fjernSidst = (t, ord) => t.replace(new RegExp("[\\s,.]*\\b(" + ord.join("|") + ")[\\s.!?]*$", "i"), "").trim();
+/* ---------- teksten, ord for ord ---------- */
+function visStykke(s) {
+  const kap = S.stykker.filter(x => x.kap === s.kap), pos = kap.indexOf(s) + 1;
+  $("hvor").innerHTML = "";
+  const b = document.createElement("b"); b.textContent = s.afsnit + " " + s.titel;
+  $("hvor").append(b, document.createTextNode(" · stykke " + pos + " af " + kap.length + " i kapitel " + s.kap));
+  $("fremdrift").style.width = (100 * pos / kap.length) + "%";
+  const l = $("laesning"); l.innerHTML = ""; S.ordIdx = -1;
+  l.hidden = ind("vistekst") !== "ja";
+  s.tekst.split(/\s+/).forEach((o, k) => {
+    const e = document.createElement("span"); e.className = "o"; e.textContent = o; e.dataset.k = k; l.append(e, document.createTextNode(" "));
+  });
+  l.scrollTop = 0;
+}
+function ordVed(s, ms) {
+  const t = s.tider; if (!t || !t.length) return -1;
+  let lo = 0, hi = t.length - 1;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (t[m] <= ms) lo = m; else hi = m - 1; }
+  return t[lo] <= ms ? lo : -1;
+}
+function markerOrd(k, klasse) {
+  const l = $("laesning"), alle = l.children;
+  if (S.ordIdx >= 0 && alle[S.ordIdx]) { alle[S.ordIdx].classList.remove("nu"); alle[S.ordIdx].classList.add("laest"); }
+  for (let j = Math.max(0, S.ordIdx + 1); j < k; j++) if (alle[j]) alle[j].classList.add("laest");
+  S.ordIdx = k;
+  const e = alle[k]; if (!e) return;
+  e.classList.add(klasse || "nu");
+  if (!l.hidden) {
+    const maal = e.offsetTop - l.clientHeight / 2 + e.offsetHeight / 2;
+    if (Math.abs(l.scrollTop - maal) > 24) l.scrollTop = Math.max(0, maal);
+  }
+}
+function foelg() {
+  const s = S.stykker[S.i], mit = koersel;
+  const tik = () => {
+    if (mit !== koersel || S.t !== "laeser" || afsp.paused || afsp.ended) return;
+    const k = ordVed(s, afsp.currentTime * 1000 + 80);
+    if (k >= 0 && k !== S.ordIdx) markerOrd(k);
+    requestAnimationFrame(tik);
+  };
+  requestAnimationFrame(tik);
+}
+function saetningStart(s, ord) {
+  // starten af den sætning, ordet står i: det første ord efter et ord, der ender på . ! eller ?
+  const o = s.tekst.split(/\s+/);
+  let k = Math.max(0, Math.min(ord, o.length - 1));
+  while (k > 0 && !/[.!?]$/.test(o[k - 1])) k--;
+  const t = s.tider;
+  return t && t[k] ? Math.max(0, t[k] - 150) : 0;
+}
+function ordeneFoer(s, ord, n = 10) { const o = s.tekst.split(/\s+/); return o.slice(Math.max(0, ord - n + 1), ord + 1).join(" "); }
 
-function lytTale({ vent, stille, kunKommando }) {
+/* ---------- lytning: Siri ---------- */
+const Gjenk = window.SpeechRecognition || window.webkitSpeechRecognition;
+const rens = t => t.toLowerCase().replace(/[.,!?;:«»"']/g, "").replace(/\s+/g, " ").trim();
+// Siri hører ikke altid ordet rigtigt; de nære varianter tæller med, når ordet er standardordet.
+const VAR = { stop: ["stop", "stok", "stopp", "stoppe", "stopper"], slut: ["slut", "slot", "slud", "sluts", "slutte"],
+              gentag: ["gentag"], tilbage: ["tilbage"], fortsaet: ["fortsæt", "fortsat"] };
+function varianter(felt, std) { const o = rens(ind(felt) || std); return o === std ? VAR[std] : [o]; }
+const sidsteOrd = t => { const o = rens(t).split(" "); return o[o.length - 1] || ""; };
+const fjernSidst = (t, ord) => t.replace(new RegExp("([\\s,.]*\\b(" + ord.join("|") + ")\\b[\\s.!?]*)+$", "i"), "").trim();
+
+const Lyt = {
+  rec: null, aktiv: false, grund: "", fin: "", mid: "", onRes: null, onFejl: null, korte: 0, t0: 0,
+  start(onRes, onFejl) {
+    this.stop(); this.grund = this.fin = this.mid = ""; this.onRes = onRes; this.onFejl = onFejl; this.aktiv = true; this.korte = 0;
+    try { this.ny(); } catch (e) { this.stop(); onFejl && onFejl(String(e)); }
+  },
+  stop() {
+    this.aktiv = false; const r = this.rec; this.rec = null;
+    if (r) { r.onresult = r.onend = r.onerror = null; try { r.abort(); } catch (e) {} }
+  },
+  tekst() { return (this.grund + " " + this.fin + " " + this.mid).replace(/\s+/g, " ").trim(); },
+  ny() {
+    const r = this.rec = new Gjenk();
+    r.lang = "da-DK"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    this.t0 = Date.now(); S.lytStartet = Date.now();
+    r.onresult = e => {
+      if (r !== this.rec) return;
+      let fin = "", mid = "";
+      for (let k = 0; k < e.results.length; k++) { const x = e.results[k]; if (x.isFinal) fin += x[0].transcript + " "; else mid += x[0].transcript + " "; }
+      this.fin = fin.trim(); this.mid = mid.trim();
+      const sidst = e.results[e.results.length - 1];
+      this.onRes && this.onRes({ tekst: this.tekst(), segment: (sidst && sidst[0].transcript) || "", endelig: !!(sidst && sidst.isFinal) });
+    };
+    r.onerror = e => {
+      if (r !== this.rec) return;
+      if (["not-allowed", "service-not-allowed", "audio-capture"].includes(e.error)) { this.stop(); this.onFejl && this.onFejl(e.error); }
+      // no-speech, aborted og network: onend følger, og der startes igen
+    };
+    r.onend = () => {
+      if (r !== this.rec || !this.aktiv) return;
+      this.grund = (this.grund + " " + this.fin).trim(); this.fin = ""; this.mid = "";
+      this.korte = Date.now() - this.t0 < 1500 ? this.korte + 1 : 0;
+      if (this.korte >= 6) { this.stop(); this.onFejl && this.onFejl("genstart"); return; }
+      setTimeout(() => { if (this.aktiv && r === this.rec) { try { this.ny(); } catch (e) { this.stop(); this.onFejl && this.onFejl(String(e)); } } }, 150);
+    };
+    r.start();
+  },
+};
+
+function lytEfterStop() {
+  if (ind("lytstop") !== "ja" || !Gjenk) return;
+  if (Lyt.aktiv && Lyt.formaal === "stop") return;
+  Lyt.formaal = "stop";
+  Lyt.start(r => {
+    if (S.t !== "laeser") return;
+    const o = sidsteOrd(r.segment);
+    if (!varianter("stopord", "stop").includes(o)) return;
+    // ordet kan også være Jeppes eget, hvis det står i teksten lige nu
+    const s = S.stykker[S.i], naer = rens(ordeneFoer(s, S.ordIdx + 2, 5)).split(" ");
+    if (naer.some(x => VAR.stop.includes(x))) return;
+    stopSagt("stemme");
+  }, f => { if (f !== "genstart") visBesked(fejltekst(f), true); else visBesked("Lytningen under oplæsningen virker ikke her. Brug knappen Stop.", true); });
+}
+
+function lytKommentar() {
   return new Promise(res => {
-    const v = varianter(rens(ind("slutord") || "næste"));
-    let rec = null, grund = "", nu = "", slut = false, tStart, tStille, talt = false;
-    const tekst = () => (grund + " " + nu).replace(/\s+/g, " ").trim();
-    const afslut = r => {
-      if (slut) return; slut = true; clearTimeout(tStart); clearTimeout(tStille);
-      try { rec && rec.abort(); } catch (e) {}
-      res(r);
-    };
-    const efterTekst = () => { const t = fjernSidst(tekst(), v.slut.concat(v.fjern)); return t ? { type: "kommentar", tekst: t } : { type: "ingen" }; };
+    let slut = false, tTavs = null, tMax = null, talt = false, hoert = "";
+    const afslut = r => { if (slut) return; slut = true; clearTimeout(tTavs); clearTimeout(tMax); S.slutNu = null; afbryd = null; Lyt.stop(); res(r); };
+    const slutMed = () => { const t = fjernSidst(hoert, varianter("slutord", "slut").concat(varianter("stopord", "stop"))); return t ? { type: "kommentar", tekst: t } : { type: "slut" }; };
     afbryd = () => afslut({ type: "afbrudt" });
-    const ny = () => {
-      rec = new Gjenk(); rec.lang = "da-DK"; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
-      rec.onresult = e => {
-        let fin = "", mid = "";
-        for (let k = 0; k < e.results.length; k++) { const r = e.results[k]; if (r.isFinal) fin += r[0].transcript + " "; else mid += r[0].transcript + " "; }
-        nu = (fin + mid).trim();
-        const t = tekst(), r = rens(t);
-        if (!t) return;
-        if (!talt) { talt = true; clearTimeout(tStart); if (!kunKommando) saetTilstand("optager"); }
-        $("udskrift").textContent = t;
-        if (KOMMANDO[r]) return afslut({ type: KOMMANDO[r] });
-        if (/^gentag\b|\bgentag$/.test(r) && r.split(" ").length <= 4) return afslut({ type: "gentag" });
-        if (kunKommando) { clearTimeout(tStille); tStille = setTimeout(() => { grund = ""; nu = ""; talt = false; }, 2500); return; }
-        if (v.slut.includes(r)) return afslut({ type: "ingen" });
-        if (v.slut.some(o => r.endsWith(" " + o))) return afslut({ type: "kommentar", tekst: fjernSidst(t, v.slut) });
-        clearTimeout(tStille); tStille = setTimeout(() => afslut(efterTekst()), stille * 1000);
-      };
-      rec.onerror = e => {
-        if (tekst() && !kunKommando) return afslut(efterTekst());
-        if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") return afslut({ type: "fejl", fejl: e.error });
-      };
-      rec.onend = () => {
-        if (slut) return;
-        grund = tekst(); nu = "";
-        try { ny(); } catch (e) { afslut(efterTekst()); }
-      };
-      rec.start();
-    };
-    try { ny(); } catch (e) { return afslut({ type: "fejl", fejl: String(e) }); }
-    if (vent) tStart = setTimeout(() => { if (!talt) afslut({ type: "ingen" }); }, vent * 1000);
+    S.slutNu = () => afslut(slutMed());
+    const tavs = tal("tavs") || 30;
+    tTavs = setTimeout(() => { if (!talt) afslut({ type: "pause" }); }, tavs * 1000);
+    tMax = setTimeout(() => afslut(slutMed()), 15 * 60 * 1000);
+    Lyt.formaal = "kommentar";
+    Lyt.start(r => {
+      const t = r.tekst; if (!t) return;
+      hoert = t;
+      if (!talt) { talt = true; clearTimeout(tTavs); saetTilstand("optager"); }
+      $("udskrift").textContent = t;
+      const o = sidsteOrd(r.segment), alle = rens(t).split(" ");
+      if (varianter("slutord", "slut").includes(o)) return afslut(slutMed());
+      if (alle.length <= 2 && VAR.gentag.includes(alle[alle.length - 1])) return afslut({ type: "gentag" });
+      if (alle.length <= 2 && VAR.tilbage.includes(alle[alle.length - 1])) return afslut({ type: "tilbage" });
+    }, f => afslut({ type: "fejl", fejl: f }));
   });
 }
 
@@ -316,51 +423,44 @@ function rms() {
   const a = new Float32Array(S.analysator.fftSize); S.analysator.getFloatTimeDomainData(a);
   let s = 0; for (const x of a) s += x * x; return Math.sqrt(s / a.length);
 }
-function lytOptag({ vent, stille }) {
+async function lytOptag() {
+  if (!(await sikrMikrofon())) return { type: "fejl", fejl: "mikrofon" };
   return new Promise(res => {
     if (S.ac && S.ac.state === "suspended") S.ac.resume();
-    let mr, dele = [], slut = false, talt = false, sidstHoejt = 0, hoejtMs = 0;
-    const t0 = performance.now(), maaling = [];
+    let mr, dele = [], slut = false, talt = false, sidstHoejt = 0, hoejtMs = 0, tik = null;
+    const t0 = performance.now(), maaling = [], tavs = tal("tavs") || 30, stille = tal("stille");
     try { mr = new MediaRecorder(S.strom); } catch (e) { return res({ type: "fejl", fejl: String(e) }); }
     mr.ondataavailable = e => { if (e.data && e.data.size) dele.push(e.data); };
-    const afslut = behold => {
-      if (slut) return; slut = true; clearInterval(tik);
-      mr.onstop = () => {
-        if (!behold) return res({ type: "ingen" });
+    const afslut = (type) => {
+      if (slut) return; slut = true; clearInterval(tik); S.slutNu = null; afbryd = null; Lyt.stop();
+      const svar = () => {
+        if (type !== "kommentar" || !talt) return res({ type: type === "kommentar" ? "slut" : type });
         const lyd = new Blob(dele, { type: mr.mimeType || "audio/mp4" });
         res({ type: "kommentar", tekst: "", lyd, varighed: Math.round((sidstHoejt - t0) / 1000) });
       };
-      try { mr.stop(); } catch (e) { res({ type: behold ? "kommentar" : "ingen", tekst: "" }); }
+      mr.onstop = svar;
+      try { mr.stop(); } catch (e) { svar(); }
     };
-    afbryd = () => { afslut(false); };
+    afbryd = () => afslut("afbrudt");
+    S.slutNu = () => afslut("kommentar");
     mr.start(250);
+    // slutordet virker også her, hvis Siri kan lytte samtidig med optagelsen; ellers knappen eller stilheden
+    if (Gjenk) {
+      Lyt.formaal = "kommentar";
+      Lyt.start(r => { const o = sidsteOrd(r.segment); if (varianter("slutord", "slut").includes(o)) afslut("kommentar"); }, () => {});
+    }
     let graense = 0.02;
-    const tik = setInterval(() => {
+    tik = setInterval(() => {
       const nu = performance.now(), r = rms();
       if (nu - t0 < 350) { maaling.push(r); return; }
       if (!graense || maaling.length) { const m = maaling.sort((a, b) => a - b)[Math.floor(maaling.length / 2)] || 0.005; graense = Math.max(m * 2.8, 0.012); maaling.length = 0; }
       if (r > graense) { hoejtMs += 50; if (hoejtMs >= 200) { if (!talt) { talt = true; saetTilstand("optager"); } sidstHoejt = nu; } }
       else hoejtMs = Math.max(0, hoejtMs - 25);
-      if (!talt && nu - t0 > vent * 1000) return afslut(false);
-      if (talt && nu - sidstHoejt > stille * 1000) return afslut(true);
-      if (nu - t0 > 180000) return afslut(true);
+      if (!talt && nu - t0 > tavs * 1000) return afslut("pause");
+      if (talt && stille > 0 && nu - sidstHoejt > stille * 1000) return afslut("kommentar");
+      if (nu - t0 > 15 * 60 * 1000) return afslut("kommentar");
     }, 50);
   });
-}
-
-async function lyt(kunKommando = false) {
-  $("udskrift").textContent = "";
-  const valg = { vent: kunKommando ? 0 : tal("vent"), stille: tal("stille"), kunKommando };
-  if (!kunKommando) {
-    saetTilstand("bip");
-    const ok = await spil(BIP.tal, 1);
-    if (!ok) return { type: "afbrudt" };
-    saetTilstand("lytter");
-  }
-  if (ind("modus") === "tale" && Gjenk) return lytTale(valg);
-  if (kunKommando) return { type: "ingen" };
-  if (!(await sikrMikrofon())) return { type: "fejl", fejl: "mikrofon" };
-  return lytOptag(valg);
 }
 
 /* ---------- gang gennem stykkerne ---------- */
@@ -368,10 +468,10 @@ const hvil = ms => new Promise(r => setTimeout(r, ms));
 const gruppeStart = i => { while (i > 0 && !S.stykker[i - 1].stop) i--; return i; };
 function gemPos() { try { localStorage.setItem("pos:" + S.meta.rapport, String(S.i)); } catch (e) {} }
 
-async function koer(fra) {
+async function koer(fra, fraMs = 0) {
   stopAlt();
   const mit = ++koersel;
-  S.i = fra; S.lytterPause = false;
+  S.i = fra; S.sted = null;
   laasSkaerm(); knapper(true);
   while (mit === koersel && S.i < S.stykker.length) {
     const s = S.stykker[S.i];
@@ -379,63 +479,90 @@ async function koer(fra) {
     let url;
     try { url = await lydUrl(s); } catch (e) { visBesked("Lyden til afsnit " + s.afsnit + " kunne ikke hentes. Er der net, eller er lyden hentet?", true); pause(); return; }
     if (mit !== koersel) return;
-    const ok = await spil(url, tal("tempo") || 1);
+    lytEfterStop();
+    const ok = await spil(url, tal("tempo") || 1, fraMs, true);
+    fraMs = 0;
     if (mit !== koersel) return;
-    if (!ok) { pause(); return; }
-    if (s.stop) {
-      const r = await lyt();
-      if (mit !== koersel) return;
-      // iPhonen skifter lyden tilbage fra mikrofon til højttaler; uden pausen skæres starten af
-      if (r.type !== "afbrudt") { await hvil(tal("hvile") * 1000); if (mit !== koersel) return; }
-      if (r.type === "gentag") { await spil(BIP.gemt, 1); S.i = gruppeStart(S.i); continue; }
-      if (r.type === "tilbage") { await spil(BIP.gemt, 1); S.i = gruppeStart(Math.max(0, gruppeStart(S.i) - 1)); continue; }
-      if (r.type === "pause") { S.i++; gemPos(); pause(); return; }
-      if (r.type === "fejl") { await spil(BIP.fejl, 1); visBesked(fejltekst(r.fejl), true); S.i++; gemPos(); pause(); return; }
-      if (r.type === "kommentar") {
-        await gemKommentar(s, r);
-        saetTilstand("gemt");
-        await spil(BIP.gemt, 1);
-        if (mit !== koersel) return;
-      }
-    }
+    if (!ok) { pause(afsp.currentTime * 1000); return; }
     S.i++; gemPos();
   }
-  if (mit === koersel && S.i >= S.stykker.length) { saetTilstand("faerdig"); knapper(false); }
+  if (mit === koersel && S.i >= S.stykker.length) { Lyt.stop(); saetTilstand("faerdig"); knapper(false); }
+}
+
+async function stopSagt(via) {
+  if (S.t !== "laeser") return;
+  const s = S.stykker[S.i], ms = Math.round(afsp.currentTime * 1000);
+  const ord = S.ordIdx >= 0 ? S.ordIdx : Math.max(0, ordVed(s, ms));
+  stopAlt(); Lyt.stop();
+  S.sted = { i: S.i, nr: s.nr, ms, ord, via };
+  markerOrd(ord, "stop");
+  saetTilstand("bip");
+  await spil(BIP.tal, 1);
+  kommentar();
+}
+
+async function kommentar() {
+  const sted = S.sted, mit = ++koersel;
+  $("udskrift").textContent = "";
+  saetTilstand("lytter");
+  const r = ind("modus") === "tale" && Gjenk ? await lytKommentar() : await lytOptag();
+  if (mit !== koersel || r.type === "afbrudt") return;
+  const s = S.stykker[sted.i];
+  if (r.type === "fejl") { await spil(BIP.fejl, 1); visBesked(fejltekst(r.fejl), true); pause(saetningStart(s, sted.ord)); return; }
+  if (r.type === "pause") { pause(saetningStart(s, sted.ord)); return; }
+  if (r.type === "gentag") { await spil(BIP.gemt, 1); return videre(mit, sted.i, 0); }
+  if (r.type === "tilbage") { await spil(BIP.gemt, 1); return videre(mit, gruppeStart(Math.max(0, gruppeStart(sted.i) - 1)), 0); }
+  if (r.type === "kommentar") {
+    await gemKommentar(s, sted, r);
+    saetTilstand("gemt");
+    await spil(BIP.gemt, 1);
+    if (mit !== koersel) return;
+  }
+  videre(mit, sted.i, saetningStart(s, sted.ord));
+}
+async function videre(mit, i, ms) {
+  // iPhonen skifter lyden tilbage fra mikrofon til højttaler; uden pausen skæres starten af
+  await hvil(tal("hvile") * 1000);
+  if (mit !== koersel) return;
+  koer(i, ms);
 }
 function fejltekst(f) {
-  if (f === "not-allowed" || f === "service-not-allowed") return "Talegenkendelsen må ikke bruge mikrofonen. Slå Siri og diktering til, og giv siden lov til mikrofonen (aA i adresselinjen, Webstedsindstillinger). Eller skift til «Optag lyd» under Indstillinger.";
-  return "Lytningen virkede ikke (" + f + "). Prøv «Optag lyd» under Indstillinger.";
+  if (f === "not-allowed" || f === "service-not-allowed") return "Talegenkendelsen må ikke bruge mikrofonen. Slå Siri og diktering til, og giv siden lov til mikrofonen (aA i adresselinjen, Webstedsindstillinger). Eller vælg «Lyd (optagelse)» under Indstillinger.";
+  if (f === "genstart") return "Lytningen bliver ved med at stoppe. Brug knapperne, eller vælg «Lyd (optagelse)» under Indstillinger.";
+  return "Lytningen virkede ikke (" + f + "). Prøv «Lyd (optagelse)» under Indstillinger.";
 }
-async function pause() {
-  stopAlt();
+let pauseLyt = 0;
+async function pause(ms) {
+  if (S.t === "laeser") ms = afsp.currentTime * 1000;
+  stopAlt(); Lyt.stop();
+  S.pauseMs = ms || 0;
   saetTilstand("pause"); knapper(true);
-  if (ind("modus") === "tale" && Gjenk && !S.lytterPause) {
-    S.lytterPause = true;
-    const mit = koersel;
-    for (let n = 0; n < 40 && mit === koersel && S.t === "pause"; n++) {
-      const r = await lyt(true);
-      if (mit !== koersel || S.t !== "pause") break;
-      if (r.type === "fortsaet") { koer(S.i); return; }
-      if (r.type === "fejl") break;
-    }
-    S.lytterPause = false;
+  if (ind("lytstop") === "ja" && Gjenk) {
+    // i pause lyttes der efter «fortsæt» og slutordet i to minutter; derefter er det knappen
+    const mit = ++pauseLyt;
+    Lyt.formaal = "pause";
+    Lyt.start(r => { if (S.t !== "pause" || mit !== pauseLyt) return; const o = sidsteOrd(r.segment); if (VAR.fortsaet.includes(o) || varianter("slutord", "slut").includes(o)) startKnap(); }, () => {});
+    setTimeout(() => { if (mit === pauseLyt && S.t === "pause" && Lyt.formaal === "pause") Lyt.stop(); }, 120000);
   }
 }
 function knapper(i_gang) {
   ["tilbage", "naeste", "gentag"].forEach(k => $(k).disabled = !i_gang);
-  $("start").textContent = S.t === "pause" ? "Fortsæt" : (S.t === "klar" || S.t === "faerdig" ? "Start" : "Pause");
+  const b = $("start");
+  const k = S.t === "pause" ? "fortsaet" : (S.t === "klar" || S.t === "faerdig") ? "start" : (S.t === "lytter" || S.t === "optager") ? "slut" : "stop";
+  b.dataset.k = k;
+  b.textContent = { fortsaet: "Fortsæt", start: "Start", slut: "Slut", stop: "Stop" }[k];
 }
 async function startKnap() {
   if (S.t === "klar" || S.t === "faerdig") {
-    await laasLydOp();
-    koer(parseInt($("afsnit").value, 10) || 0);
+    await laasLydOp(); S.nytValg = false;
+    koer(parseInt($("afsnit").value, 10) || 0, 0);
   } else if (S.t === "pause") {
     await laasLydOp();
-    const fra = S.nytValg ? (parseInt($("afsnit").value, 10) || 0) : S.i;
-    S.nytValg = false;
-    koer(fra);
-  }
-  else pause();
+    const nyt = S.nytValg; S.nytValg = false;
+    koer(nyt ? (parseInt($("afsnit").value, 10) || 0) : S.i, nyt ? 0 : S.pauseMs);
+  } else if (S.t === "lytter" || S.t === "optager") {
+    if (S.slutNu) S.slutNu();
+  } else if (S.t === "laeser") stopSagt("knap");
 }
 async function laasLydOp() {
   try { if (S.ac && S.ac.state === "suspended") await S.ac.resume(); } catch (e) {}
@@ -443,19 +570,11 @@ async function laasLydOp() {
 }
 
 /* ---------- visning ---------- */
-const ORD = { klar: "Klar", laeser: "Læser", bip: "Bip", lytter: "Tal nu", optager: "Optager", gemt: "Gemt", pause: "Pause", faerdig: "Færdig" };
+const ORD = { klar: "Klar", laeser: "Læser", bip: "Stop", lytter: "Tal nu", optager: "Skriver ned", gemt: "Gemt", pause: "Pause", faerdig: "Færdig" };
 function saetTilstand(t) {
-  S.t = t; $("tilstand").dataset.t = t; $("ord").textContent = ORD[t] || t;
-  if (t === "laeser" || t === "bip") $("udskrift").textContent = "";
+  S.t = t; $("tilstand").dataset.t = t; $("ord").textContent = t === "optager" && ind("modus") === "optag" ? "Optager" : (ORD[t] || t);
+  if (t === "laeser") $("udskrift").textContent = "";
   knapper(t !== "klar" && t !== "faerdig");
-}
-function visStykke(s) {
-  const kap = S.stykker.filter(x => x.kap === s.kap), pos = kap.indexOf(s) + 1;
-  $("hvor").innerHTML = "";
-  const b = document.createElement("b"); b.textContent = s.afsnit + " " + s.titel;
-  $("hvor").append(b, document.createTextNode(" · stykke " + pos + " af " + kap.length + " i kapitel " + s.kap));
-  $("fremdrift").style.width = (100 * pos / kap.length) + "%";
-  $("stykketekst").textContent = ind("vistekst") === "ja" ? s.tekst : "";
 }
 function visBesked(t, fejl) { const b = $("besked"); b.textContent = t || ""; b.classList.toggle("fejl", !!fejl); }
 function medie(s) {
@@ -476,10 +595,9 @@ const DB = {
   laeg(o) { return this.kald("readwrite", st => st.put(o)); },
   slet(id) { return this.kald("readwrite", st => st.delete(id)); },
 };
-async function gemKommentar(s, r) {
-  const g = S.stykker[gruppeStart(S.stykker.indexOf(s))];
-  const o = { rapport: S.meta.rapport, afsnit: s.afsnit, titel: s.titel, stykke_fra: g.nr, stykke_til: s.nr,
-              linje_fra: g.linje, linje_til: s.linje, tekst_start: g.kilde, tekst_slut: s.kilde,
+async function gemKommentar(s, sted, r) {
+  const o = { rapport: S.meta.rapport, afsnit: s.afsnit, titel: s.titel, stykke: s.nr, linje: s.linje, tekst_start: s.kilde,
+              ord: sted.ord, ved: ordeneFoer(s, sted.ord), ms: sted.ms, stop_via: sted.via,
               kommentar: r.tekst || "", lyd: r.lyd || null, varighed: r.varighed || null,
               modus: ind("modus"), tid: new Date().toISOString() };
   try { await DB.laeg(o); } catch (e) { visBesked("Kommentaren kunne ikke gemmes: " + e.message, true); }
@@ -495,14 +613,15 @@ async function visKommentarer() {
     const top = document.createElement("div"); top.className = "top";
     const tid = new Date(k.tid);
     top.textContent = "K" + (n + 1) + " · " + k.afsnit + " " + k.titel + " · " + tid.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
+    const ved = document.createElement("div"); ved.className = "ved"; ved.textContent = k.ved ? "… " + k.ved : (k.tekst_slut ? k.tekst_slut.slice(0, 80) + " …" : "");
     const tekst = document.createElement("div");
     tekst.textContent = k.kommentar || (k.lyd ? "Lydkommentar" + (k.varighed ? ", ca. " + k.varighed + " s" : "") : "(tom)");
     const r = document.createElement("div"); r.className = "raekke";
-    if (k.lyd) { const p = document.createElement("button"); p.textContent = "Afspil"; p.onclick = () => { stopAlt(); saetTilstand("pause"); afsp.src = URL.createObjectURL(k.lyd); afsp.playbackRate = 1; afsp.play(); }; r.append(p); }
+    if (k.lyd) { const p = document.createElement("button"); p.textContent = "Afspil"; p.onclick = () => { stopAlt(); Lyt.stop(); saetTilstand("pause"); afsp.src = URL.createObjectURL(k.lyd); afsp.playbackRate = 1; afsp.play(); }; r.append(p); }
     const sl = document.createElement("button"); sl.textContent = "Slet";
     sl.onclick = async () => { if (sl.dataset.sikker) { await DB.slet(k.id); visKommentarer(); } else { sl.dataset.sikker = "1"; sl.textContent = "Tryk igen for at slette"; } };
     r.append(sl);
-    a.append(top, tekst, r); liste.append(a);
+    a.append(top, ved, tekst, r); liste.append(a);
   });
   return alle;
 }
@@ -512,11 +631,13 @@ async function filer() {
   const lyde = [], ud = alle.map((k, n) => {
     let navn = null;
     if (k.lyd) { const ext = (k.lyd.type || "").includes("webm") ? "webm" : "m4a"; navn = "Oplaesning_K" + String(n + 1).padStart(2, "0") + "_" + k.afsnit + "." + ext; lyde.push(new File([k.lyd], navn, { type: k.lyd.type || "audio/mp4" })); }
-    return { nr: "K" + (n + 1), afsnit: k.afsnit, titel: k.titel, linje_fra: k.linje_fra, linje_til: k.linje_til,
-             stykke_fra: k.stykke_fra, stykke_til: k.stykke_til, tekst_start: k.tekst_start, tekst_slut: k.tekst_slut,
+    return { nr: "K" + (n + 1), afsnit: k.afsnit, titel: k.titel, linje: k.linje != null ? k.linje : k.linje_fra, stykke: k.stykke != null ? k.stykke : k.stykke_til,
+             tekst_start: k.tekst_start, ved: k.ved || k.tekst_slut || "", ord: k.ord, stop_via: k.stop_via,
              kommentar: k.kommentar, lyd: navn, tid: k.tid, modus: k.modus };
   });
-  const json = JSON.stringify({ rapport: S.meta.rapport, kilde_sha: S.meta.kilde_sha, bygget: S.meta.bygget, eksporteret: new Date().toISOString(), kommentarer: ud }, null, 1);
+  const json = JSON.stringify({ rapport: S.meta.rapport, kilde_sha: S.meta.kilde_sha, bygget: S.meta.bygget, eksporteret: new Date().toISOString(),
+                                forklaring: "ved = de sidste ord, der var læst op, da der blev sagt stop; linje = linjen i Rapport vN.md; tekst_start = linjens begyndelse",
+                                kommentarer: ud }, null, 1);
   return { alle, filer: [new File([json], "Oplaesning_kommentarer_" + stempel + ".json", { type: "application/json" }), ...lyde], tekst: ud };
 }
 async function del() {
@@ -530,7 +651,7 @@ async function del() {
 }
 async function kopier() {
   const { tekst } = await filer();
-  const t = tekst.map(k => k.nr + " (" + k.afsnit + " " + k.titel + ", linje " + k.linje_fra + "-" + k.linje_til + "): " + (k.kommentar || "[lydkommentar " + k.lyd + "]")).join("\n");
+  const t = tekst.map(k => k.nr + " (" + k.afsnit + " " + k.titel + ", linje " + k.linje + ", ved «… " + k.ved + "»): " + (k.kommentar || "[lydkommentar " + k.lyd + "]")).join("\n");
   try { await navigator.clipboard.writeText(t); visBesked("Kommentarerne er kopieret."); } catch (e) { visBesked(t); }
 }
 
@@ -564,30 +685,40 @@ function byggAfsnitsliste() {
   S.stykker.forEach(s => minutter[s.kap] = (minutter[s.kap] || 0) + s.tekst.split(" ").length / 165);
   $("kapiteltid").textContent = Object.entries(minutter).map(([k, m]) => "Kap " + k + ": ca. " + Math.max(1, Math.round(m)) + " min").join(" · ");
 }
+async function test() {
+  stopAlt(); Lyt.stop(); await laasLydOp(); visBesked("");
+  $("udskrift").textContent = ""; S.sted = null;
+  saetTilstand("lytter"); $("hvor").textContent = "Sig noget, og afslut med «" + (ind("slutord") || "slut") + "» eller knappen Slut.";
+  const mit = ++koersel;
+  const r = ind("modus") === "tale" && Gjenk ? await lytKommentar() : await lytOptag();
+  if (mit !== koersel) return;
+  saetTilstand("klar"); knapper(false);
+  $("hvor").textContent = r.type === "kommentar" ? (r.tekst ? "Hørt: «" + r.tekst + "»" : "Optaget ca. " + r.varighed + " s lyd.") :
+    r.type === "pause" ? "Intet hørt." : r.type === "fejl" ? fejltekst(r.fejl) : r.type === "slut" ? "Kun slutordet hørt." : "Kommando: " + r.type;
+  if (r.lyd) { afsp.src = URL.createObjectURL(r.lyd); afsp.playbackRate = 1; afsp.play(); }
+}
 async function init() {
   laesInd();
-  IND.forEach(k => $(k).addEventListener("change", () => { gemInd(); modusMaerke(); }));
+  IND.forEach(k => $(k).addEventListener("change", () => { gemInd(); modusMaerke(); if (k === "vistekst") $("laesning").hidden = ind("vistekst") !== "ja"; }));
   $("start").onclick = startKnap;
   $("afsnit").addEventListener("change", () => { S.nytValg = true; });
   $("naeste").onclick = () => { let j = S.i; while (j < S.stykker.length - 1 && !S.stykker[j].stop) j++; koer(Math.min(S.stykker.length - 1, j + 1)); };
   $("tilbage").onclick = () => koer(gruppeStart(Math.max(0, gruppeStart(S.i) - 1)));
   $("gentag").onclick = () => koer(gruppeStart(S.i));
-  $("test").onclick = async () => {
-    stopAlt(); await laasLydOp(); visBesked("");
-    const r = await lyt();
-    saetTilstand("klar");
-    $("hvor").textContent = r.type === "kommentar" ? (r.tekst ? "Hørt: «" + r.tekst + "»" : "Optaget ca. " + r.varighed + " s lyd.") :
-      r.type === "ingen" ? "Intet hørt." : r.type === "fejl" ? fejltekst(r.fejl) : "Kommando: " + r.type;
-    if (r.lyd) { afsp.src = URL.createObjectURL(r.lyd); afsp.playbackRate = 1; afsp.play(); }
-  };
+  $("test").onclick = test;
   $("hent").onclick = hentAlt;
   $("del").onclick = del;
   $("kopier").onclick = kopier;
-  afsp.addEventListener("pause", () => { if (!S.egenPause && S.t === "laeser" && !afsp.ended) pause(); });
+  afsp.addEventListener("pause", () => {
+    if (S.egenPause || S.t !== "laeser" || afsp.ended) return;
+    // lige efter at Siri er sat til at lytte, kan iPhonen selv sætte lyden på pause et øjeblik; så spilles der videre
+    if (Date.now() - S.lytStartet < 1200) { const p = afsp.play(); if (p) p.catch(() => stopSagt("knap")); return; }
+    stopSagt("knap");
+  });
   if ("mediaSession" in navigator) {
     const ms = navigator.mediaSession, h = (a, f) => { try { ms.setActionHandler(a, f); } catch (e) {} };
-    h("play", () => { if (S.t === "pause") { koer(S.i); } });
-    h("pause", () => { if (S.t !== "pause" && S.t !== "klar") pause(); });
+    h("play", () => { if (S.t === "pause") startKnap(); else if (S.t === "lytter" || S.t === "optager") { if (S.slutNu) S.slutNu(); } });
+    h("pause", () => { if (S.t === "laeser") stopSagt("knap"); });
     h("nexttrack", () => $("naeste").click());
     h("previoustrack", () => $("gentag").click());
   }
@@ -602,15 +733,18 @@ async function init() {
   } catch (e) { visBesked("Rapporten kunne ikke åbnes. Er linket rigtigt, og er der net?", true); $("start").disabled = true; return; }
   $("rapportnavn").textContent = "Oplæsning · " + S.meta.rapport;
   document.title = "Oplæsning · " + S.meta.rapport;
-  $("byggeinfo").textContent = "Bygget " + S.meta.bygget + " af " + S.meta.rapport + " (" + S.stykker.length + " stykker, stemme Jeppe).";
+  const udenTider = S.stykker.filter(s => !s.tider || !s.tider.length).length;
+  $("byggeinfo").textContent = "Bygget " + S.meta.bygget + " af " + S.meta.rapport + " (" + S.stykker.length + " stykker, stemme Jeppe" + (udenTider ? ", " + udenTider + " uden ordtider" : "") + ").";
   byggAfsnitsliste();
   visKommentarer();
 }
 function modusMaerke() {
-  const m = ind("modus") === "tale" ? (Gjenk ? "Tale til tekst" : "Tale til tekst findes ikke her") : "Optag lyd";
+  const m = (ind("modus") === "tale" ? (Gjenk ? "Tekst" : "Tekst (Siri findes ikke her)") : "Lyd") + (ind("lytstop") === "ja" && Gjenk ? " · lytter efter «" + (ind("stopord") || "stop") + "»" : " · knappen");
   $("modusmaerke").textContent = m;
 }
 init();
+// til afprøvning uden mikrofon: OPL.simuler("stop") spiller en hørt sætning ind, som om Siri havde hørt den
+window.OPL = { S, Lyt, koer, stopSagt, simuler: (segment, tekst) => Lyt.onRes && Lyt.onRes({ tekst: tekst != null ? tekst : segment, segment, endelig: true }) };
 </script>
 </body>
 </html>
