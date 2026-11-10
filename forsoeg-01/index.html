@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d1117">
+<title>Oplæsning i bilen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Instrumentbræt om natten: én stor tilstand øverst, teksten der læses op under den, store knapper, resten foldet ind. */
+:root {
+  --bg: #0d1117; --panel: #161c25; --linje: #263040; --tekst: #e8edf4; --svag: #8b97a8;
+  --gul: #f2b33d; --roed: #ef5a4c; --groen: #47c27d; --blaa: #6aa6ff;
+  --skrift: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--tekst); font-family: var(--skrift); font-size: 17px; line-height: 1.45; }
+body { padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+main { max-width: 640px; margin: 0 auto; display: grid; gap: 14px; }
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+h1 { font-size: 1.05rem; margin: 0; letter-spacing: .02em; }
+.lille { font-size: .82rem; color: var(--svag); }
+.tilstand { background: var(--panel); border: 2px solid var(--linje); border-radius: 18px; padding: 16px 18px; display: grid; gap: 8px; align-content: start; transition: border-color .2s; }
+.tilstand .ord { font-size: 2.6rem; font-weight: 700; line-height: 1.05; letter-spacing: -.01em; }
+.tilstand .hvor { font-size: 1.05rem; color: var(--svag); }
+.tilstand .hvor b { color: var(--tekst); }
+.tilstand[data-t="lytter"] { border-color: var(--gul); } .tilstand[data-t="lytter"] .ord { color: var(--gul); }
+.tilstand[data-t="optager"] { border-color: var(--roed); } .tilstand[data-t="optager"] .ord { color: var(--roed); }
+.tilstand[data-t="gemt"] { border-color: var(--groen); } .tilstand[data-t="gemt"] .ord { color: var(--groen); }
+.tilstand[data-t="pause"] .ord, .tilstand[data-t="klar"] .ord { color: var(--blaa); }
+.udskrift { font-size: 1.2rem; min-height: 1.4em; color: var(--tekst); }
+.udskrift:empty { display: none; }
+.fremdrift { height: 6px; background: var(--linje); border-radius: 3px; overflow: hidden; }
+.fremdrift i { display: block; height: 100%; width: 0; background: var(--blaa); }
+.laesning { position: relative; background: var(--panel); border: 1px solid var(--linje); border-radius: 18px; padding: 14px 18px; font-size: 1.3rem; line-height: 1.55; max-height: 40vh; min-height: 5em; overflow: auto; scroll-behavior: smooth; }
+.laesning[hidden] { display: none; }
+/* mærket for kommentarer og ændringer ved stykket: lille, oppe i hjørnet; feltet under folder ud ved tryk eller mus */
+.laesning .maerke { position: sticky; top: 0; float: right; margin: -6px -8px 0 8px; font-size: .78rem; color: var(--svag); background: var(--panel); border: 1px solid var(--linje); border-radius: 10px; padding: 2px 8px; cursor: pointer; user-select: none; }
+.laesning .maerke.aendret { color: var(--groen); border-color: var(--groen); }
+.laesning .maerke[hidden] { display: none; }
+.aendring { background: var(--panel); border: 1px solid var(--groen); border-radius: 14px; padding: 10px 14px; font-size: .92rem; display: grid; gap: 8px; }
+.aendring[hidden] { display: none; }
+.aendring article { display: grid; gap: 3px; border-top: 1px solid var(--linje); padding-top: 6px; }
+.aendring article:first-child { border-top: 0; padding-top: 0; }
+.aendring .k { color: var(--svag); font-size: .85rem; }
+.aendring del { background: #3a1d1a; color: #ffb3ab; text-decoration: line-through; border-radius: 4px; padding: 0 2px; }
+.aendring ins { background: #163a25; color: #9fe6bb; text-decoration: none; border-radius: 4px; padding: 0 2px; }
+.laesning .o { color: var(--svag); border-radius: 6px; padding: 0 2px; }
+.laesning .o.laest { color: var(--tekst); }
+.laesning .o.nu { background: var(--gul); color: #1a1200; font-weight: 700; }
+.laesning .o.stop { background: var(--roed); color: #fff; font-weight: 700; }
+.knapper { display: grid; grid-template-columns: 1fr .85fr 1.5fr .85fr 1fr; gap: 6px; }
+.knapper button.anden { padding: 12px 4px; font-size: .95rem; }
+button, select, input { font: inherit; color: inherit; }
+button { background: var(--panel); border: 1px solid var(--linje); border-radius: 14px; padding: 12px 10px; min-height: 64px; font-weight: 700; cursor: pointer; }
+button:active { transform: scale(.98); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--blaa); outline-offset: 2px; }
+button.hoved { background: var(--blaa); color: #08111f; border-color: var(--blaa); font-size: 1.3rem; }
+button.hoved[data-k="stop"] { background: var(--gul); border-color: var(--gul); }
+button.hoved[data-k="slut"] { background: var(--groen); border-color: var(--groen); }
+button.anden { min-height: 48px; font-weight: 400; }
+button:disabled { opacity: .45; }
+.raekke { display: flex; gap: 10px; flex-wrap: wrap; }
+.raekke > * { flex: 1 1 140px; }
+details { background: var(--panel); border: 1px solid var(--linje); border-radius: 14px; padding: 4px 14px; }
+details[open] { padding-bottom: 14px; }
+summary { cursor: pointer; padding: 10px 0; font-weight: 700; }
+label { display: grid; gap: 4px; font-size: .9rem; color: var(--svag); }
+select, input[type=number], input[type=text] { background: var(--bg); border: 1px solid var(--linje); border-radius: 10px; padding: 10px; width: 100%; color: var(--tekst); }
+.felter { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.kom { display: grid; gap: 8px; margin-top: 8px; }
+.kom article { border-top: 1px solid var(--linje); padding-top: 8px; display: grid; gap: 4px; }
+.kom article .top { display: flex; justify-content: space-between; gap: 8px; font-size: .85rem; color: var(--svag); }
+.kom article .ved { font-size: .85rem; color: var(--svag); font-style: italic; }
+.kom article button { min-height: 36px; padding: 4px 10px; font-weight: 400; font-size: .85rem; }
+.besked { background: #2a2210; border: 1px solid var(--gul); color: var(--gul); border-radius: 12px; padding: 10px 12px; font-size: .92rem; }
+.besked:empty { display: none; }
+.fejl { background: #2a1412; border-color: var(--roed); color: #ffb3ab; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="rapportnavn">Oplæsning</h1>
+    <span class="lille" id="modusmaerke"></span>
+  </header>
+
+  <div class="besked" id="besked"></div>
+
+  <section class="tilstand" id="tilstand" data-t="klar" aria-live="polite">
+    <div class="ord" id="ord">Klar</div>
+    <div class="hvor" id="hvor">Vælg, hvor du vil starte, og tryk Start.</div>
+    <div class="fremdrift" aria-hidden="true"><i id="fremdrift"></i></div>
+    <div class="udskrift" id="udskrift"></div>
+    <input id="skriv" type="text" hidden placeholder="… eller skriv kommentaren her og tryk Slut" autocomplete="off">
+  </section>
+
+  <section class="laesning" id="laesning" hidden><span class="maerke" id="maerke" hidden></span><span id="ordene"></span></section>
+  <section class="aendring" id="aendring" hidden></section>
+
+  <div class="knapper">
+    <button id="tilbage" class="anden" disabled title="Forrige afsnit">Forrige</button>
+    <button id="spoltilbage" class="anden" disabled title="5 sekunder tilbage">−5 s</button>
+    <button id="start" class="hoved">Start</button>
+    <button id="spolfrem" class="anden" disabled title="5 sekunder frem">+5 s</button>
+    <button id="naeste" class="anden" disabled title="Næste afsnit">Næste</button>
+  </div>
+  <div class="raekke">
+    <button id="gentag" class="anden" disabled>Gentag</button>
+    <button id="kommentarknap" class="anden" disabled>Kommentér</button>
+    <button id="test" class="anden">Test lytning</button>
+  </div>
+
+  <details id="startfra" open>
+    <summary>Start fra</summary>
+    <label for="afsnit">Afsnit
+      <select id="afsnit"></select>
+    </label>
+    <p class="lille" id="kapiteltid"></p>
+    <div class="raekke">
+      <button id="hent" class="anden">Hent lyden til turen</button>
+    </div>
+    <p class="lille" id="hentstatus">Hent lyden over wifi, før du kører. Så spiller den, også hvor der ikke er net.</p>
+  </details>
+
+  <details id="kommentarer">
+    <summary id="komtitel">Kommentarer (0)</summary>
+    <div class="raekke">
+      <button id="ret" class="anden" disabled>Ret kommentarer (slået fra)</button>
+      <button id="hentsvar" class="anden">Hent svar</button>
+    </div>
+    <p class="lille" id="poststatus">«Ret kommentarer» sender de usendte kommentarer til postkassen; rapporten rettes på pc'en, og svaret står under hver kommentar, når du trykker «Hent svar».</p>
+    <div class="raekke">
+      <button id="byglyd" class="anden" disabled>Opdater lyden (slået fra)</button>
+      <button id="del" class="anden">Del kommentarerne</button>
+      <button id="kopier" class="anden">Kopiér som tekst</button>
+    </div>
+    <div class="kom" id="komliste"></div>
+  </details>
+
+  <details>
+    <summary>Indstillinger</summary>
+    <div class="felter">
+      <label for="modus">Kommentaren gemmes som
+        <select id="modus">
+          <option value="tale">Tekst (Siri skriver ned)</option>
+          <option value="optag">Lyd (optagelse)</option>
+        </select>
+      </label>
+      <label for="lytstop">Lyt efter stopordet under oplæsningen
+        <select id="lytstop"><option value="ja">Ja</option><option value="nej">Nej, kun knappen</option></select>
+      </label>
+      <label for="stopord">Stopord (oplæsningen stopper, kommentaren begynder)
+        <input id="stopord" type="text" value="stop" autocomplete="off" autocapitalize="off">
+      </label>
+      <label for="slutord">Slutord (kommentaren gemmes, oplæsningen fortsætter)
+        <input id="slutord" type="text" value="slut" autocomplete="off" autocapitalize="off">
+      </label>
+      <label for="tavs">Sekunder uden ord efter stop, før det bliver en pause
+        <input id="tavs" type="number" min="5" max="120" step="5" value="30">
+      </label>
+      <label for="stille">Lyd: sekunders stilhed, før optagelsen gemmes (0 = kun slutordet eller knappen)
+        <input id="stille" type="number" min="0" max="60" step="1" value="10">
+      </label>
+      <label for="hvile">Sekunder fra kommentar til oplæsning
+        <input id="hvile" type="number" min="0" max="5" step="0.5" value="1.5">
+      </label>
+      <label for="tempo">Tempo (Jeppe er allerede 10 % hurtigere)
+        <select id="tempo">
+          <option value="0.9">90 %</option>
+          <option value="1" selected>100 %</option>
+          <option value="1.1">110 %</option>
+          <option value="1.2">120 %</option>
+        </select>
+      </label>
+      <label for="vistekst">Vis teksten, der læses op
+        <select id="vistekst"><option value="ja" selected>Ja, ord for ord</option><option value="nej">Nej</option></select>
+      </label>
+      <label for="token">GitHub-token til «Ret kommentarer» og «Opdater lyden» (bliver kun på denne telefon)
+        <input id="token" type="password" autocomplete="off" placeholder="github_pat_…">
+      </label>
+      <label for="postrepo">Postkassens repo
+        <input id="postrepo" type="text" value="austudie-tgs/oplaesning" autocomplete="off" autocapitalize="off">
+      </label>
+    </div>
+    <p class="lille">Sig «stop», når du vil kommentere: oplæsningen stopper, ordet markeres med rødt, og det, du siger, skrives ned, til du siger «slut». Så gemmes kommentaren ved det ord, og oplæsningen fortsætter fra sætningens begyndelse. Knappen Kommentér gør det samme som «stop», og knappen midtfor bliver Slut, mens du taler. Rattets pause og play virker som «stop» og «slut». «Gentag» eller «tilbage» alene efter stop går tilbage uden kommentar; «slut» uden ord læser bare videre. Pause midtfor holder bare en pause; sig «fortsæt» eller tryk Fortsæt. −5 s og +5 s spoler i stykket. Kommentaren kræver «Tekst (Siri skriver ned)» ovenfor; med «Lyd» optages den kun. Skal mikrofonen ikke godkendes hver gang, så i Safari: aA i adresselinjen, Webstedsindstillinger, Mikrofon, Tillad.</p>
+    <p class="lille" id="byggeinfo"></p>
+  </details>
+</main>
+
+<audio id="afsp" preload="auto" playsinline></audio>
+
+<script>
+"use strict";
+// Forsøgets side: eget lager på telefonen og ingen postkasse, så intet blandes med den rigtige rapports side.
+const LS = { getItem: k => localStorage.getItem("forsoeg01:" + k), setItem: (k, v) => localStorage.setItem("forsoeg01:" + k, v) };
+const $ = id => document.getElementById(id);
+const afsp = $("afsp");
+const S = { stykker: [], meta: {}, i: 0, t: "klar", noegle: null, cache: null, urls: new Map(),
+            strom: null, ac: null, analysator: null, egenPause: false, laas: null,
+            ordIdx: -1, sted: null, slutNu: null, nytValg: false, pauseMs: 0, lytStartet: 0 };
+let koersel = 0, afbryd = null;
+
+/* ---------- indstillinger ---------- */
+const IND = ["modus", "lytstop", "stopord", "slutord", "tavs", "stille", "hvile", "tempo", "vistekst", "token", "postrepo"];
+function laesInd() {
+  try {
+    const o = JSON.parse(LS.getItem("ind") || "{}");
+    // før 31-10-26 (_v 2) hed slutordet «næste», og stille/vent styrede bip-vinduet; de gamle værdier passer ikke.
+    // «Optag lyd» var dengang et nødvalg, når Siri fejlede; fra _v 4 er standarden tekst igen (ellers skrives
+    // kommentaren ikke ned, og mikrofonen skal godkendes hver gang)
+    if (o._v !== 3 && o._v !== 4) { delete o.slutord; delete o.stille; delete o.vistekst; }
+    if (o._v !== 4) delete o.modus;
+    IND.forEach(k => { if (o[k] != null) $(k).value = o[k]; });
+  } catch (e) {}
+}
+function gemInd() { try { const o = { _v: 4 }; IND.forEach(k => o[k] = $(k).value); LS.setItem("ind", JSON.stringify(o)); } catch (e) {} }
+const ind = k => $(k).value;
+const tal = k => parseFloat($(k).value) || 0;
+
+/* ---------- bip ---------- */
+function wav(dele, sr = 24000) {
+  const n = dele.reduce((a, d) => a + Math.round(d[1] * sr), 0);
+  const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const skriv = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  skriv(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); skriv(8, "WAVE"); skriv(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true);
+  v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); skriv(36, "data"); v.setUint32(40, n * 2, true);
+  let o = 44;
+  for (const [f, d, a = 0.45] of dele) {
+    const m = Math.round(d * sr);
+    for (let i = 0; i < m; i++) {
+      const env = Math.min(1, i / (sr * 0.012), (m - i) / (sr * 0.012));
+      v.setInt16(o, f ? Math.sin(2 * Math.PI * f * i / sr) * a * env * 32767 : 0, true); o += 2;
+    }
+  }
+  return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+}
+const BIP = {
+  tal: wav([[0, 0.08], [880, 0.3], [0, 0.06]]),
+  gemt: wav([[1175, 0.11], [0, 0.07], [1568, 0.16], [0, 0.1]]),
+  fejl: wav([[330, 0.35], [0, 0.1]]),
+};
+
+/* ---------- kryptering og lyd ---------- */
+function b64url(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+async function hentNoegle() {
+  let k = (location.hash.match(/k=([A-Za-z0-9_-]+)/) || [])[1];
+  try { if (k) LS.setItem("k", k); else k = LS.getItem("k"); } catch (e) {}
+  if (!k) return null;
+  return crypto.subtle.importKey("raw", b64url(k), "AES-GCM", false, ["encrypt", "decrypt"]);
+}
+async function dekrypter(buf) {
+  return crypto.subtle.decrypt({ name: "AES-GCM", iv: buf.slice(0, 12) }, S.noegle, buf.slice(12));
+}
+async function krypter(bytes) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, S.noegle, bytes));
+  const ud = new Uint8Array(12 + ct.length); ud.set(iv); ud.set(ct, 12); return ud;
+}
+function b64(bytes) { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
+async function hentFil(sti) {
+  let svar = null;
+  if (S.cache) { try { svar = await S.cache.match(sti); } catch (e) {} }
+  if (!svar) {
+    svar = await fetch(sti);
+    if (!svar.ok) throw new Error("kunne ikke hente " + sti);
+    if (S.cache) { try { await S.cache.put(sti, svar.clone()); } catch (e) {} }
+  }
+  return svar.arrayBuffer();
+}
+async function lydUrl(s) {
+  if (S.urls.has(s.fil)) return S.urls.get(s.fil);
+  const pt = await dekrypter(await hentFil("lyd/" + s.fil + ".bin"));
+  const url = URL.createObjectURL(new Blob([pt], { type: "audio/mpeg" }));
+  S.urls.set(s.fil, url);
+  if (S.urls.size > 12) { const [f, u] = S.urls.entries().next().value; URL.revokeObjectURL(u); S.urls.delete(f); }
+  return url;
+}
+function forhaand(i) { for (let j = i + 1; j < Math.min(S.stykker.length, i + 4); j++) lydUrl(S.stykker[j]).catch(() => {}); }
+
+/* ---------- afspilning ---------- */
+function spil(url, hastighed, fraMs = 0, foelgOrd = false) {
+  return new Promise(res => {
+    let slut = false;
+    const faerdig = ok => { if (slut) return; slut = true; afsp.onended = afsp.onerror = null; res(ok); };
+    afbryd = () => faerdig(false);
+    afsp.onended = () => faerdig(true);
+    afsp.onerror = () => faerdig(false);
+    afsp.src = url;
+    afsp.playbackRate = hastighed;
+    afsp.defaultPlaybackRate = hastighed;
+    if (fraMs > 0) {
+      const saet = () => { try { afsp.currentTime = fraMs / 1000; } catch (e) {} };
+      afsp.addEventListener("loadedmetadata", saet, { once: true });
+      saet();
+    }
+    const p = afsp.play();
+    if (p) p.then(() => { if (foelgOrd) foelg(); }).catch(e => { visBesked("Lyden kunne ikke spille (" + e.name + "). Tryk Fortsæt.", true); faerdig(false); });
+  });
+}
+function stopLyd() { S.egenPause = true; try { afsp.pause(); } catch (e) {} S.egenPause = false; }
+function stopAlt() { koersel++; if (afbryd) { const f = afbryd; afbryd = null; f(); } stopLyd(); }
+
+/* ---------- teksten, ord for ord ---------- */
+function visStykke(s) {
+  const kap = S.stykker.filter(x => x.kap === s.kap), pos = kap.indexOf(s) + 1;
+  $("hvor").innerHTML = "";
+  const b = document.createElement("b"); b.textContent = s.afsnit + " " + s.titel;
+  $("hvor").append(b, document.createTextNode(" · stykke " + pos + " af " + kap.length + " i kapitel " + s.kap));
+  $("fremdrift").style.width = (100 * pos / kap.length) + "%";
+  const l = $("laesning"), ordene = $("ordene"); ordene.innerHTML = ""; S.ordIdx = -1;
+  l.hidden = ind("vistekst") !== "ja";
+  s.tekst.split(/\s+/).forEach((o, k) => {
+    const e = document.createElement("span"); e.className = "o"; e.textContent = o; e.dataset.k = k; ordene.append(e, document.createTextNode(" "));
+  });
+  l.scrollTop = 0;
+  visMaerke(s);
+}
+function ordVed(s, ms) {
+  const t = s.tider; if (!t || !t.length) return -1;
+  let lo = 0, hi = t.length - 1;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (t[m] <= ms) lo = m; else hi = m - 1; }
+  return t[lo] <= ms ? lo : -1;
+}
+function markerOrd(k, klasse) {
+  const l = $("laesning"), alle = $("ordene").children;
+  if (S.ordIdx >= 0 && alle[S.ordIdx]) { alle[S.ordIdx].classList.remove("nu"); alle[S.ordIdx].classList.add("laest"); }
+  for (let j = Math.max(0, S.ordIdx + 1); j < k; j++) if (alle[j]) alle[j].classList.add("laest");
+  S.ordIdx = k;
+  const e = alle[k]; if (!e) return;
+  e.classList.add(klasse || "nu");
+  if (!l.hidden) {
+    const maal = e.offsetTop - l.clientHeight / 2 + e.offsetHeight / 2;
+    if (Math.abs(l.scrollTop - maal) > 24) l.scrollTop = Math.max(0, maal);
+  }
+}
+function foelg() {
+  const s = S.stykker[S.i], mit = koersel;
+  const tik = () => {
+    if (mit !== koersel || S.t !== "laeser" || afsp.paused || afsp.ended) return;
+    const k = ordVed(s, afsp.currentTime * 1000 + 80);
+    if (k >= 0 && k !== S.ordIdx) markerOrd(k);
+    requestAnimationFrame(tik);
+  };
+  requestAnimationFrame(tik);
+}
+function saetningStart(s, ord) {
+  // starten af den sætning, ordet står i: det første ord efter et ord, der ender på . ! eller ?
+  const o = s.tekst.split(/\s+/);
+  let k = Math.max(0, Math.min(ord, o.length - 1));
+  while (k > 0 && !/[.!?]$/.test(o[k - 1])) k--;
+  const t = s.tider;
+  return t && t[k] ? Math.max(0, t[k] - 150) : 0;
+}
+function ordeneFoer(s, ord, n = 10) { const o = s.tekst.split(/\s+/); return o.slice(Math.max(0, ord - n + 1), ord + 1).join(" "); }
+
+/* ---------- kommentarerne ved stykket: mærket og feltet med ændringen ---------- */
+// Rettelserne står ikke i teksten; et lille mærke ved stykket viser, at der er kommenteret dér, og feltet under
+// folder ud ved tryk eller mus med kommentaren, svaret og ændringen (før → efter) siden sidste kommentarrettelse.
+S.kommVed = new Map();
+async function byggKommentarkort() {
+  S.kommVed = new Map();
+  let alle = []; try { alle = (await DB.alle()).filter(k => k.rapport === S.meta.rapport); } catch (e) {}
+  for (const k of alle) {
+    // stykket i samme afsnit med den linje, der ligger nærmest; linjerne flytter sig, når rapporten rettes, afsnittet bliver
+    let bedst = null, afstand = Infinity;
+    S.stykker.forEach(s => { if (s.afsnit !== k.afsnit) return; const d = Math.abs((s.linje || 0) - (k.linje || 0)); if (d < afstand) { afstand = d; bedst = s; } });
+    if (!bedst) continue;
+    if (!S.kommVed.has(bedst.nr)) S.kommVed.set(bedst.nr, []);
+    S.kommVed.get(bedst.nr).push(k);
+  }
+  const sidste = alle.slice().sort((a, b) => (a.tid > b.tid ? 1 : -1)).pop();
+  S.sidsteKommentar = sidste || null;
+  if (S.t !== "klar" && S.stykker[S.i]) visMaerke(S.stykker[S.i]);
+  markerAfsnit();
+}
+const erAendret = k => k.svar && (k.svar.status === "✓" || k.svar.status === "◐");
+function visMaerke(s) {
+  const m = $("maerke"), liste = S.kommVed.get(s.nr) || [];
+  $("aendring").hidden = true; S.aendringFast = false;
+  if (!liste.length) { m.hidden = true; return; }
+  const aendret = liste.some(erAendret), sidst = S.sidsteKommentar && liste.includes(S.sidsteKommentar);
+  m.textContent = (aendret ? "✎ " : "💬 ") + liste.length + (sidst ? " · sidste" : "");
+  m.classList.toggle("aendret", aendret);
+  m.title = aendret ? "Stykket er rettet efter en kommentar. Tryk for at se ændringen." : "Der er kommenteret her. Tryk for at se kommentaren.";
+  m.hidden = false;
+}
+function visAendring(s, vis) {
+  const a = $("aendring"); a.innerHTML = "";
+  const liste = S.kommVed.get(s.nr) || [];
+  if (!vis || !liste.length) { a.hidden = true; return; }
+  liste.slice().sort((x, y) => (x.tid > y.tid ? 1 : -1)).forEach(k => {
+    const art = document.createElement("article");
+    const top = document.createElement("div"); top.className = "k";
+    top.textContent = (k.svar ? k.svar.status + " " + (k.svar.o || "") + " · " : (k.sendt ? "sendt · " : "ikke sendt · ")) + new Date(k.tid).toLocaleString("da-DK", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + (k.ved ? " · ved «… " + k.ved + "»" : "");
+    const kom = document.createElement("div"); kom.textContent = "Du sagde: " + (k.kommentar || (k.lyd ? "(lydkommentar)" : "(tom)"));
+    art.append(top, kom);
+    if (k.svar) {
+      const sv = document.createElement("div"); sv.textContent = "Svar: " + (k.svar.tekst || ""); art.append(sv);
+      if (k.svar.foer || k.svar.efter) { const d = document.createElement("div"); d.innerHTML = ordDiff(k.svar.foer || "", k.svar.efter || ""); art.append(d); }
+    }
+    a.append(art);
+  });
+  a.hidden = false;
+}
+function ordDiff(foer, efter) {
+  // enkel orddiff (længste fælles delfølge): slettet som <del>, nyt som <ins>
+  const a = foer.split(/\s+/).filter(Boolean), b = efter.split(/\s+/).filter(Boolean);
+  if (a.length * b.length > 250000) return esc(foer) + " → " + esc(efter);
+  const L = Array.from({ length: a.length + 1 }, () => new Uint16Array(b.length + 1));
+  for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const ud = []; let i = 0, j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { ud.push(esc(a[i])); i++; j++; }
+    else if (L[i + 1][j] >= L[i][j + 1]) { ud.push("<del>" + esc(a[i]) + "</del>"); i++; }
+    else { ud.push("<ins>" + esc(b[j]) + "</ins>"); j++; }
+  }
+  while (i < a.length) ud.push("<del>" + esc(a[i++]) + "</del>");
+  while (j < b.length) ud.push("<ins>" + esc(b[j++]) + "</ins>");
+  return ud.join(" ");
+}
+const esc = t => t.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+function markerAfsnit() {
+  // afsnit med en rettelse får en prik i listen «Start fra»
+  const aendrede = new Set();
+  for (const [nr, liste] of S.kommVed) { const s = S.stykker.find(x => x.nr === nr); if (s && liste.some(erAendret)) aendrede.add(s.afsnit); }
+  for (const o of $("afsnit").options) { const t = o.textContent.replace(/ ·$/, ""); const afs = t.split(" ")[0]; o.textContent = aendrede.has(afs) && !t.startsWith("Fortsæt") ? t + " ·" : t; }
+}
+
+/* ---------- lytning: Siri ---------- */
+const Gjenk = window.SpeechRecognition || window.webkitSpeechRecognition;
+const rens = t => t.toLowerCase().replace(/[.,!?;:«»"']/g, "").replace(/\s+/g, " ").trim();
+// Siri hører ikke altid ordet rigtigt; de nære varianter tæller med, når ordet er standardordet.
+const VAR = { stop: ["stop", "stok", "stopp", "stoppe", "stopper"], slut: ["slut", "slot", "slud", "sluts", "slutte"],
+              gentag: ["gentag"], tilbage: ["tilbage"], fortsaet: ["fortsæt", "fortsat"] };
+function varianter(felt, std) { const o = rens(ind(felt) || std); return o === std ? VAR[std] : [o]; }
+const sidsteOrd = t => { const o = rens(t).split(" "); return o[o.length - 1] || ""; };
+const fjernSidst = (t, ord) => t.replace(new RegExp("([\\s,.]*\\b(" + ord.join("|") + ")\\b[\\s.!?]*)+$", "i"), "").trim();
+
+const Lyt = {
+  rec: null, aktiv: false, grund: "", fin: "", mid: "", onRes: null, onFejl: null, korte: 0, t0: 0, fra: 0, antal: 0,
+  start(onRes, onFejl) {
+    this.stop(); this.grund = this.fin = this.mid = ""; this.fra = this.antal = 0; this.onRes = onRes; this.onFejl = onFejl; this.aktiv = true; this.korte = 0;
+    try { this.ny(); } catch (e) { this.stop(); onFejl && onFejl(String(e)); }
+  },
+  // samme lyttesession, ny lytter: alt, der er hørt før nu, ignoreres. iPhonen taber gerne en session, der
+  // startes lige efter en anden er afbrudt, så skiftet fra «lyt efter stop» til «skriv kommentaren ned» sker uden ny session.
+  skift(onRes, onFejl) {
+    if (!this.aktiv || !this.rec) return false;
+    this.grund = this.fin = this.mid = ""; this.fra = this.antal; this.onRes = onRes; this.onFejl = onFejl; this.korte = 0;
+    return true;
+  },
+  lyt(onRes, onFejl) { if (!this.skift(onRes, onFejl)) this.start(onRes, onFejl); },
+  stop() {
+    this.aktiv = false; const r = this.rec; this.rec = null;
+    if (r) { r.onresult = r.onend = r.onerror = null; try { r.abort(); } catch (e) {} }
+  },
+  tekst() { return (this.grund + " " + this.fin + " " + this.mid).replace(/\s+/g, " ").trim(); },
+  ny() {
+    const r = this.rec = new Gjenk();
+    r.lang = "da-DK"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    this.t0 = Date.now(); S.lytStartet = Date.now();
+    r.onresult = e => {
+      if (r !== this.rec) return;
+      let fin = "", mid = "";
+      for (let k = this.fra; k < e.results.length; k++) { const x = e.results[k]; if (x.isFinal) fin += x[0].transcript + " "; else mid += x[0].transcript + " "; }
+      this.antal = e.results.length;
+      this.fin = fin.trim(); this.mid = mid.trim();
+      const sidst = e.results[e.results.length - 1];
+      this.onRes && this.onRes({ tekst: this.tekst(), segment: (sidst && sidst[0].transcript) || "", endelig: !!(sidst && sidst.isFinal) });
+    };
+    r.onerror = e => {
+      if (r !== this.rec) return;
+      if (["not-allowed", "service-not-allowed", "audio-capture"].includes(e.error)) { this.stop(); this.onFejl && this.onFejl(e.error); }
+      // no-speech, aborted og network: onend følger, og der startes igen
+    };
+    r.onend = () => {
+      if (r !== this.rec || !this.aktiv) return;
+      this.grund = (this.grund + " " + this.fin).trim(); this.fin = ""; this.mid = ""; this.fra = this.antal = 0;
+      this.korte = Date.now() - this.t0 < 1500 ? this.korte + 1 : 0;
+      if (this.korte >= 6) { this.stop(); this.onFejl && this.onFejl("genstart"); return; }
+      setTimeout(() => { if (this.aktiv && r === this.rec) { try { this.ny(); } catch (e) { this.stop(); this.onFejl && this.onFejl(String(e)); } } }, 150);
+    };
+    r.start();
+  },
+};
+
+function lytEfterStop() {
+  if (ind("lytstop") !== "ja" || !Gjenk) return;
+  if (Lyt.aktiv && Lyt.formaal === "stop") return;
+  Lyt.formaal = "stop";
+  Lyt.lyt(r => {
+    if (S.t !== "laeser") return;
+    const o = sidsteOrd(r.segment);
+    if (!varianter("stopord", "stop").includes(o)) return;
+    // ordet kan også være Jeppes eget, hvis det står i teksten lige nu
+    const s = S.stykker[S.i], naer = rens(ordeneFoer(s, S.ordIdx + 2, 5)).split(" ");
+    if (naer.some(x => VAR.stop.includes(x))) return;
+    stopSagt("stemme");
+  }, f => { if (f !== "genstart") visBesked(fejltekst(f), true); else visBesked("Lytningen under oplæsningen virker ikke her. Brug knappen Stop.", true); });
+}
+
+function lytKommentar() {
+  return new Promise(res => {
+    let slut = false, tTavs = null, tMax = null, talt = false, hoert = "";
+    const skriv = $("skriv");
+    // lyttesessionen bliver stående til næste fase (oplæsningen skifter den til «lyt efter stop»)
+    const afslut = r => { if (slut) return; slut = true; clearTimeout(tTavs); clearTimeout(tMax); S.slutNu = null; afbryd = null; skriv.oninput = null; res(r); };
+    // det skrevne gælder frem for det hørte, så kommentaren også kan skrives på pc'en eller rettes, før den gemmes
+    const stopOrd = varianter("stopord", "stop");
+    const slutMed = () => {
+      let t = skriv.value.trim() || fjernSidst(hoert, varianter("slutord", "slut").concat(stopOrd));
+      t = t.replace(new RegExp("^(" + stopOrd.join("|") + ")\\b[\\s,.]*", "i"), "").trim();
+      return t ? { type: "kommentar", tekst: t } : { type: "slut" };
+    };
+    afbryd = () => afslut({ type: "afbrudt" });
+    S.slutNu = () => afslut(slutMed());
+    const tavs = tal("tavs") || 30;
+    tTavs = setTimeout(() => { if (!talt) afslut({ type: "pause" }); }, tavs * 1000);
+    tMax = setTimeout(() => afslut(slutMed()), 15 * 60 * 1000);
+    skriv.oninput = () => { if (!talt) { talt = true; clearTimeout(tTavs); saetTilstand("optager"); } };
+    if (!Gjenk) { visBesked("Siri findes ikke her; skriv kommentaren og tryk Slut."); return; }
+    Lyt.formaal = "kommentar";
+    Lyt.lyt(r => {
+      const t = r.tekst; if (!t) return;
+      hoert = t;
+      if (!talt) { talt = true; clearTimeout(tTavs); saetTilstand("optager"); }
+      $("udskrift").textContent = t;
+      const o = sidsteOrd(r.segment), alle = rens(t).split(" ");
+      if (varianter("slutord", "slut").includes(o)) return afslut(slutMed());
+      if (alle.length <= 2 && VAR.gentag.includes(alle[alle.length - 1])) return afslut({ type: "gentag" });
+      if (alle.length <= 2 && VAR.tilbage.includes(alle[alle.length - 1])) return afslut({ type: "tilbage" });
+    }, f => { visBesked(fejltekst(f) + " Du kan skrive kommentaren i feltet og trykke Slut.", true); });
+  });
+}
+
+/* ---------- lytning: optag lyd ---------- */
+async function sikrMikrofon() {
+  if (S.strom && S.strom.active) return true;
+  try {
+    S.strom = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    S.ac = S.ac || new (window.AudioContext || window.webkitAudioContext)();
+    const kilde = S.ac.createMediaStreamSource(S.strom);
+    S.analysator = S.ac.createAnalyser(); S.analysator.fftSize = 1024;
+    kilde.connect(S.analysator);
+    return true;
+  } catch (e) { visBesked("Mikrofonen kan ikke bruges: " + e.message, true); return false; }
+}
+function rms() {
+  const a = new Float32Array(S.analysator.fftSize); S.analysator.getFloatTimeDomainData(a);
+  let s = 0; for (const x of a) s += x * x; return Math.sqrt(s / a.length);
+}
+async function lytOptag() {
+  if (!(await sikrMikrofon())) return { type: "fejl", fejl: "mikrofon" };
+  return new Promise(res => {
+    if (S.ac && S.ac.state === "suspended") S.ac.resume();
+    let mr, dele = [], slut = false, talt = false, sidstHoejt = 0, hoejtMs = 0, tik = null;
+    const t0 = performance.now(), maaling = [], tavs = tal("tavs") || 30, stille = tal("stille");
+    try { mr = new MediaRecorder(S.strom); } catch (e) { return res({ type: "fejl", fejl: String(e) }); }
+    mr.ondataavailable = e => { if (e.data && e.data.size) dele.push(e.data); };
+    const afslut = (type) => {
+      if (slut) return; slut = true; clearInterval(tik); S.slutNu = null; afbryd = null; Lyt.stop();
+      const svar = () => {
+        const skrevet = $("skriv").value.trim();
+        if (type !== "kommentar" || (!talt && !skrevet)) return res({ type: type === "kommentar" ? "slut" : type });
+        const lyd = talt ? new Blob(dele, { type: mr.mimeType || "audio/mp4" }) : null;
+        res({ type: "kommentar", tekst: skrevet, lyd, varighed: talt ? Math.round((sidstHoejt - t0) / 1000) : null });
+      };
+      mr.onstop = svar;
+      try { mr.stop(); } catch (e) { svar(); }
+    };
+    afbryd = () => afslut("afbrudt");
+    S.slutNu = () => afslut("kommentar");
+    mr.start(250);
+    // slutordet virker også her, hvis Siri kan lytte samtidig med optagelsen; ellers knappen eller stilheden
+    if (Gjenk) {
+      Lyt.formaal = "kommentar";
+      Lyt.start(r => { const o = sidsteOrd(r.segment); if (varianter("slutord", "slut").includes(o)) afslut("kommentar"); }, () => {});
+    }
+    let graense = 0.02;
+    tik = setInterval(() => {
+      const nu = performance.now(), r = rms();
+      if (nu - t0 < 350) { maaling.push(r); return; }
+      if (!graense || maaling.length) { const m = maaling.sort((a, b) => a - b)[Math.floor(maaling.length / 2)] || 0.005; graense = Math.max(m * 2.8, 0.012); maaling.length = 0; }
+      if (r > graense) { hoejtMs += 50; if (hoejtMs >= 200) { if (!talt) { talt = true; saetTilstand("optager"); } sidstHoejt = nu; } }
+      else hoejtMs = Math.max(0, hoejtMs - 25);
+      if (!talt && nu - t0 > tavs * 1000) return afslut("pause");
+      if (talt && stille > 0 && nu - sidstHoejt > stille * 1000) return afslut("kommentar");
+      if (nu - t0 > 15 * 60 * 1000) return afslut("kommentar");
+    }, 50);
+  });
+}
+
+/* ---------- gang gennem stykkerne ---------- */
+const hvil = ms => new Promise(r => setTimeout(r, ms));
+const gruppeStart = i => { while (i > 0 && !S.stykker[i - 1].stop) i--; return i; };
+function gemPos() { try { LS.setItem("pos:" + S.meta.rapport, String(S.i)); } catch (e) {} }
+
+async function koer(fra, fraMs = 0) {
+  stopAlt();
+  const mit = ++koersel;
+  S.i = fra; S.sted = null;
+  laasSkaerm(); knapper(true);
+  while (mit === koersel && S.i < S.stykker.length) {
+    const s = S.stykker[S.i];
+    visStykke(s); saetTilstand("laeser"); forhaand(S.i); medie(s);
+    let url;
+    try { url = await lydUrl(s); } catch (e) { visBesked("Lyden til afsnit " + s.afsnit + " kunne ikke hentes. Er der net, eller er lyden hentet?", true); pause(); return; }
+    if (mit !== koersel) return;
+    lytEfterStop();
+    const ok = await spil(url, tal("tempo") || 1, fraMs, true);
+    fraMs = 0;
+    if (mit !== koersel) return;
+    if (!ok) { pause(afsp.currentTime * 1000); return; }
+    S.i++; gemPos();
+  }
+  if (mit === koersel && S.i >= S.stykker.length) { Lyt.stop(); saetTilstand("faerdig"); knapper(false); }
+}
+
+async function stopSagt(via) {
+  if (S.t !== "laeser") return;
+  const s = S.stykker[S.i], ms = Math.round(afsp.currentTime * 1000);
+  const ord = S.ordIdx >= 0 ? S.ordIdx : Math.max(0, ordVed(s, ms));
+  stopAlt();  // lytningen bliver stående; kommentaren skifter den
+  S.sted = { i: S.i, nr: s.nr, ms, ord, via };
+  markerOrd(ord, "stop");
+  saetTilstand("bip");
+  await spil(BIP.tal, 1);
+  kommentar();
+}
+
+async function kommentar() {
+  const sted = S.sted, mit = ++koersel;
+  $("udskrift").textContent = "";
+  saetTilstand("lytter");
+  const r = ind("modus") === "tale" && Gjenk ? await lytKommentar() : await lytOptag();
+  if (mit !== koersel || r.type === "afbrudt") return;
+  const s = S.stykker[sted.i];
+  if (r.type === "fejl") { await spil(BIP.fejl, 1); visBesked(fejltekst(r.fejl), true); pause(saetningStart(s, sted.ord)); return; }
+  if (r.type === "pause") { pause(saetningStart(s, sted.ord)); return; }
+  if (r.type === "gentag") { await spil(BIP.gemt, 1); return videre(mit, sted.i, 0); }
+  if (r.type === "tilbage") { await spil(BIP.gemt, 1); return videre(mit, gruppeStart(Math.max(0, gruppeStart(sted.i) - 1)), 0); }
+  if (r.type === "kommentar") {
+    await gemKommentar(s, sted, r);
+    saetTilstand("gemt");
+    await spil(BIP.gemt, 1);
+    if (mit !== koersel) return;
+  }
+  videre(mit, sted.i, saetningStart(s, sted.ord));
+}
+async function videre(mit, i, ms) {
+  // iPhonen skifter lyden tilbage fra mikrofon til højttaler; uden pausen skæres starten af
+  await hvil(tal("hvile") * 1000);
+  if (mit !== koersel) return;
+  koer(i, ms);
+}
+function fejltekst(f) {
+  if (f === "not-allowed" || f === "service-not-allowed") return "Talegenkendelsen må ikke bruge mikrofonen. Slå Siri og diktering til, og giv siden lov til mikrofonen (aA i adresselinjen, Webstedsindstillinger). Eller vælg «Lyd (optagelse)» under Indstillinger.";
+  if (f === "genstart") return "Lytningen bliver ved med at stoppe. Brug knapperne, eller vælg «Lyd (optagelse)» under Indstillinger.";
+  return "Lytningen virkede ikke (" + f + "). Prøv «Lyd (optagelse)» under Indstillinger.";
+}
+let pauseLyt = 0;
+async function pause(ms) {
+  if (S.t === "laeser") ms = afsp.currentTime * 1000;
+  stopAlt();
+  S.pauseMs = ms || 0;
+  saetTilstand("pause"); knapper(true);
+  if (ind("lytstop") === "ja" && Gjenk) {
+    // i pause lyttes der efter «fortsæt» og slutordet i to minutter; derefter er det knappen
+    const mit = ++pauseLyt;
+    Lyt.formaal = "pause";
+    Lyt.lyt(r => { if (S.t !== "pause" || mit !== pauseLyt) return; const o = sidsteOrd(r.segment); if (VAR.fortsaet.includes(o) || varianter("slutord", "slut").includes(o)) startKnap(); }, () => {});
+    setTimeout(() => { if (mit === pauseLyt && S.t === "pause" && Lyt.formaal === "pause") Lyt.stop(); }, 120000);
+  } else Lyt.stop();
+}
+function knapper(i_gang) {
+  ["tilbage", "naeste", "gentag"].forEach(k => $(k).disabled = !i_gang);
+  $("kommentarknap").disabled = S.t !== "laeser";
+  ["spoltilbage", "spolfrem"].forEach(k => $(k).disabled = !(S.t === "laeser" || S.t === "pause"));
+  const b = $("start");
+  const k = S.t === "pause" ? "fortsaet" : (S.t === "klar" || S.t === "faerdig") ? "start" : (S.t === "lytter" || S.t === "optager") ? "slut" : "pause";
+  b.dataset.k = k;
+  b.textContent = { fortsaet: "Fortsæt", start: "Start", slut: "Slut", pause: "Pause" }[k];
+}
+function spol(sek) {
+  // 5 sekunder frem eller tilbage i stykket; i pause flyttes det sted, der fortsættes fra
+  if (S.t === "laeser") {
+    const slut = isFinite(afsp.duration) ? afsp.duration - 0.2 : Infinity;
+    afsp.currentTime = Math.max(0, Math.min(slut, afsp.currentTime + sek));
+    const s = S.stykker[S.i], k = ordVed(s, afsp.currentTime * 1000);
+    if (k >= 0) { $("ordene").querySelectorAll(".o.nu, .o.laest").forEach(e => e.classList.remove("nu", "laest")); S.ordIdx = -1; markerOrd(k); }
+  } else if (S.t === "pause") S.pauseMs = Math.max(0, S.pauseMs + sek * 1000);
+}
+async function startKnap() {
+  if (S.t === "klar" || S.t === "faerdig") {
+    await laasLydOp(); S.nytValg = false;
+    koer(parseInt($("afsnit").value, 10) || 0, 0);
+  } else if (S.t === "pause") {
+    await laasLydOp();
+    const nyt = S.nytValg; S.nytValg = false;
+    koer(nyt ? (parseInt($("afsnit").value, 10) || 0) : S.i, nyt ? 0 : S.pauseMs);
+  } else if (S.t === "lytter" || S.t === "optager") {
+    if (S.slutNu) S.slutNu();
+  } else if (S.t === "laeser") pause();
+}
+async function laasLydOp() {
+  try { if (S.ac && S.ac.state === "suspended") await S.ac.resume(); } catch (e) {}
+  if (ind("modus") === "optag") await sikrMikrofon();
+}
+
+/* ---------- visning ---------- */
+const ORD = { klar: "Klar", laeser: "Læser", bip: "Stop", lytter: "Tal nu", optager: "Skriver ned", gemt: "Gemt", pause: "Pause", faerdig: "Færdig" };
+function saetTilstand(t) {
+  S.t = t; $("tilstand").dataset.t = t; $("ord").textContent = t === "optager" && ind("modus") === "optag" ? "Optager" : (ORD[t] || t);
+  if (t === "laeser") $("udskrift").textContent = "";
+  const skriv = $("skriv"), iKommentar = t === "lytter" || t === "optager";
+  skriv.hidden = !iKommentar; if (!iKommentar) skriv.value = "";
+  knapper(t !== "klar" && t !== "faerdig");
+}
+function visBesked(t, fejl) { const b = $("besked"); b.textContent = t || ""; b.classList.toggle("fejl", !!fejl); }
+function medie(s) {
+  if (!("mediaSession" in navigator)) return;
+  try { navigator.mediaSession.metadata = new MediaMetadata({ title: s.afsnit + " " + s.titel, artist: S.meta.rapport || "Rapport", album: "Oplæsning" }); } catch (e) {}
+}
+async function laasSkaerm() {
+  try { if ("wakeLock" in navigator && !S.laas) { S.laas = await navigator.wakeLock.request("screen"); S.laas.addEventListener("release", () => S.laas = null); } } catch (e) {}
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.t !== "klar") laasSkaerm(); });
+
+/* ---------- kommentarer ---------- */
+const DB = {
+  db: null,
+  aabn() { return new Promise((res, rej) => { const r = indexedDB.open("oplaesning-forsoeg-01", 1); r.onupgradeneeded = () => r.result.createObjectStore("kommentarer", { keyPath: "id", autoIncrement: true }); r.onsuccess = () => { this.db = r.result; res(); }; r.onerror = () => rej(r.error); }); },
+  kald(mode, f) { return new Promise((res, rej) => { const st = this.db.transaction("kommentarer", mode).objectStore("kommentarer"); const r = f(st); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+  alle() { return this.kald("readonly", st => st.getAll()); },
+  laeg(o) { return this.kald("readwrite", st => st.put(o)); },
+  slet(id) { return this.kald("readwrite", st => st.delete(id)); },
+};
+async function gemKommentar(s, sted, r) {
+  const o = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+              rapport: S.meta.rapport, afsnit: s.afsnit, titel: s.titel, stykke: s.nr, linje: s.linje, tekst_start: s.kilde,
+              ord: sted.ord, ved: ordeneFoer(s, sted.ord), ms: sted.ms, stop_via: sted.via,
+              kommentar: r.tekst || "", lyd: r.lyd || null, varighed: r.varighed || null,
+              modus: ind("modus"), tid: new Date().toISOString(), sendt: null, batch: null, svar: null };
+  try { await DB.laeg(o); } catch (e) { visBesked("Kommentaren kunne ikke gemmes: " + e.message, true); }
+  try { const k = JSON.parse(LS.getItem("kom_tekst") || "[]"); k.push({ ...o, lyd: !!o.lyd }); LS.setItem("kom_tekst", JSON.stringify(k)); } catch (e) {}
+  visKommentarer();
+}
+async function visKommentarer() {
+  let alle = []; try { alle = (await DB.alle()).filter(k => k.rapport === S.meta.rapport); } catch (e) {}
+  $("komtitel").textContent = "Kommentarer (" + alle.length + ")";
+  const liste = $("komliste"); liste.innerHTML = "";
+  alle.forEach((k, n) => {
+    const a = document.createElement("article");
+    const top = document.createElement("div"); top.className = "top";
+    const tid = new Date(k.tid);
+    top.textContent = "K" + (n + 1) + " · " + k.afsnit + " " + k.titel + " · " + tid.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
+    const ved = document.createElement("div"); ved.className = "ved"; ved.textContent = k.ved ? "… " + k.ved : (k.tekst_slut ? k.tekst_slut.slice(0, 80) + " …" : "");
+    const tekst = document.createElement("div");
+    tekst.textContent = (k.kommentar || "") + (k.lyd ? (k.kommentar ? " + " : "") + "lydkommentar" + (k.varighed ? ", ca. " + k.varighed + " s" : "") : "") || "(tom)";
+    const post = document.createElement("div"); post.className = "ved";
+    if (k.svar) {
+      post.textContent = (k.svar.status || "") + " " + (k.svar.o ? k.svar.o + " · " : "") + (k.svar.tekst || "");
+      if (k.svar.foer || k.svar.efter) post.textContent += " [" + (k.svar.foer || "…") + " → " + (k.svar.efter || "…") + "]";
+      post.style.color = k.svar.status === "✓" ? "var(--groen)" : k.svar.status === "✗" ? "var(--roed)" : "var(--gul)";
+    } else post.textContent = k.sendt ? "Sendt " + new Date(k.sendt).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" }) + " · venter på svar" : "Ikke sendt";
+    const r = document.createElement("div"); r.className = "raekke";
+    if (k.lyd) { const p = document.createElement("button"); p.textContent = "Afspil"; p.onclick = () => { stopAlt(); Lyt.stop(); saetTilstand("pause"); afsp.src = URL.createObjectURL(k.lyd); afsp.playbackRate = 1; afsp.play(); }; r.append(p); }
+    const sl = document.createElement("button"); sl.textContent = "Slet";
+    sl.onclick = async () => { if (sl.dataset.sikker) { await DB.slet(k.id); visKommentarer(); } else { sl.dataset.sikker = "1"; sl.textContent = "Tryk igen for at slette"; } };
+    r.append(sl);
+    a.append(top, ved, tekst, post, r); liste.append(a);
+  });
+  byggKommentarkort();
+  const usendte = alle.filter(k => !k.sendt).length, besvarede = alle.filter(k => k.svar).length;
+  $("ret").textContent = "Ret kommentarer" + (usendte ? " (" + usendte + ")" : "");
+  $("poststatus").textContent = alle.length ? usendte + " usendte · " + (alle.length - usendte - besvarede) + " venter på svar · " + besvarede + " besvaret." :
+    "«Ret kommentarer» sender de usendte kommentarer til postkassen; rapporten rettes på pc'en, og svaret står under hver kommentar, når du trykker «Hent svar».";
+  return alle;
+}
+
+/* ---------- postkassen: Ret kommentarer, Opdater lyden, Hent svar ---------- */
+async function githubPut(sti, bytes, besked) {
+  throw new Error("Slået fra: forsøgets side sender ikke kommentarer og bestiller ikke lyd.");
+  const [ejer, repo] = (ind("postrepo") || "austudie-tgs/oplaesning").split("/");
+  const r = await fetch("https://api.github.com/repos/" + ejer + "/" + repo + "/contents/" + sti, {
+    method: "PUT", headers: { Authorization: "Bearer " + ind("token"), Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+    body: JSON.stringify({ message: besked, content: b64(bytes) }) });
+  if (!r.ok) throw new Error("GitHub svarede " + r.status + (r.status === 401 || r.status === 403 || r.status === 404 ? ". Er tokenet rigtigt, og må det skrive i " + ejer + "/" + repo + "?" : ""));
+}
+const batchNavn = (p) => p + "_" + dato(new Date()) + "_" + Math.random().toString(36).slice(2, 6);
+async function lydB64(blob) { if (!blob || blob.size > 3e6) return null; return b64(new Uint8Array(await blob.arrayBuffer())); }
+async function retKommentarer() {
+  if (!ind("token")) return visBesked("Skriv GitHub-tokenet under Indstillinger først, eller brug «Del kommentarerne».", true);
+  let alle = []; try { alle = (await DB.alle()).filter(k => k.rapport === S.meta.rapport && !k.sendt); } catch (e) {}
+  if (!alle.length) return visBesked("Alle kommentarer er sendt.");
+  const navn = batchNavn("K"), ud = [];
+  for (const k of alle) ud.push({ id: k.id, afsnit: k.afsnit, titel: k.titel, linje: k.linje, stykke: k.stykke, tekst_start: k.tekst_start, ved: k.ved, ord: k.ord,
+                                  kommentar: k.kommentar || "", lyd: await lydB64(k.lyd), lyd_type: k.lyd ? k.lyd.type : null, tid: k.tid, modus: k.modus });
+  const json = JSON.stringify({ batch: navn, rapport: S.meta.rapport, kilde_sha: S.meta.kilde_sha, bygget: S.meta.bygget, sendt: new Date().toISOString(), kommentarer: ud });
+  $("ret").disabled = true; visBesked("Sender " + alle.length + " kommentarer …");
+  try {
+    await githubPut("post/ind/" + navn + ".bin", await krypter(new TextEncoder().encode(json)), "Kommentarer " + navn);
+    const nu = new Date().toISOString();
+    for (const k of alle) { k.sendt = nu; k.batch = navn; await DB.laeg(k); }
+    visBesked(alle.length + " kommentarer sendt. Postkassen på pc'en retter rapporten; tryk «Hent svar» om nogle minutter.");
+  } catch (e) { visBesked("Kunne ikke sende: " + e.message, true); }
+  $("ret").disabled = false; visKommentarer();
+}
+async function bygLyd() {
+  if (!ind("token")) return visBesked("Skriv GitHub-tokenet under Indstillinger først.", true);
+  const navn = batchNavn("B");
+  $("byglyd").disabled = true;
+  try {
+    await githubPut("post/ind/" + navn + "-byg.bin", await krypter(new TextEncoder().encode(JSON.stringify({ type: "byg", rapport: S.meta.rapport, tid: new Date().toISOString() }))), "Byg lyden " + navn);
+    visBesked("Lyden er bestilt. Den bygges på pc'en og ligger her om nogle minutter; genindlæs siden, og hent lyden til turen igen.");
+  } catch (e) { visBesked("Kunne ikke bestille: " + e.message, true); }
+  $("byglyd").disabled = false;
+}
+async function hentSvar(stille) {
+  // svarene ligger på siden selv (post/svar/<batch>.bin, krypteret med samme nøgle); intet token nødvendigt
+  let alle = []; try { alle = (await DB.alle()).filter(k => k.rapport === S.meta.rapport && k.sendt && !k.svar); } catch (e) {}
+  const batches = [...new Set(alle.map(k => k.batch).filter(Boolean))];
+  let nye = 0;
+  for (const b of batches) {
+    try {
+      const r = await fetch("post/svar/" + b + ".bin?v=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) continue;
+      const svar = JSON.parse(new TextDecoder().decode(await dekrypter(await r.arrayBuffer())));
+      for (const s of svar.svar || []) { const k = alle.find(x => x.id === s.id); if (k) { k.svar = s; await DB.laeg(k); nye++; } }
+    } catch (e) {}
+  }
+  if (!stille) visBesked(nye ? nye + " svar hentet." : batches.length ? "Ingen svar endnu. Postkassen kører hvert andet minut på pc'en, og siden har svaret et minut efter." : "Alt er besvaret.");
+  if (nye) visKommentarer();
+}
+const dato = d => { const p = n => String(n).padStart(2, "0"); return p(d.getFullYear() % 100) + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "_" + p(d.getHours()) + p(d.getMinutes()); };
+async function filer() {
+  const alle = await visKommentarer(), stempel = dato(new Date());
+  const lyde = [], ud = alle.map((k, n) => {
+    let navn = null;
+    if (k.lyd) { const ext = (k.lyd.type || "").includes("webm") ? "webm" : "m4a"; navn = "Oplaesning_K" + String(n + 1).padStart(2, "0") + "_" + k.afsnit + "." + ext; lyde.push(new File([k.lyd], navn, { type: k.lyd.type || "audio/mp4" })); }
+    return { nr: "K" + (n + 1), id: k.id, afsnit: k.afsnit, titel: k.titel, linje: k.linje != null ? k.linje : k.linje_fra, stykke: k.stykke != null ? k.stykke : k.stykke_til,
+             tekst_start: k.tekst_start, ved: k.ved || k.tekst_slut || "", ord: k.ord, stop_via: k.stop_via,
+             kommentar: k.kommentar, lyd: navn, tid: k.tid, modus: k.modus, sendt: k.sendt || null, batch: k.batch || null, svar: k.svar || null };
+  });
+  const json = JSON.stringify({ rapport: S.meta.rapport, kilde_sha: S.meta.kilde_sha, bygget: S.meta.bygget, eksporteret: new Date().toISOString(),
+                                forklaring: "ved = de sidste ord, der var læst op, da der blev sagt stop; linje = linjen i Rapport vN.md; tekst_start = linjens begyndelse",
+                                kommentarer: ud }, null, 1);
+  return { alle, filer: [new File([json], "Oplaesning_kommentarer_" + stempel + ".json", { type: "application/json" }), ...lyde], tekst: ud };
+}
+async function del() {
+  const { alle, filer: f } = await filer();
+  if (!alle.length) return visBesked("Der er ingen kommentarer endnu.");
+  if (navigator.canShare && navigator.canShare({ files: f })) {
+    // ingen title: iPhonen gemmer den som en ekstra, tom .txt-fil
+    try { await navigator.share({ files: f }); return; } catch (e) { if (e.name === "AbortError") return; }
+  }
+  f.forEach(fil => { const a = document.createElement("a"); a.href = URL.createObjectURL(fil); a.download = fil.name; document.body.append(a); a.click(); a.remove(); });
+}
+async function kopier() {
+  const { tekst } = await filer();
+  const t = tekst.map(k => k.nr + " (" + k.afsnit + " " + k.titel + ", linje " + k.linje + ", ved «… " + k.ved + "»): " + (k.kommentar || "[lydkommentar " + k.lyd + "]")).join("\n");
+  try { await navigator.clipboard.writeText(t); visBesked("Kommentarerne er kopieret."); } catch (e) { visBesked(t); }
+}
+
+/* ---------- hent til turen ---------- */
+async function hentAlt() {
+  const fra = parseInt($("afsnit").value, 10) || 0, liste = S.stykker.slice(fra);
+  $("hent").disabled = true;
+  let n = 0, fejl = 0;
+  for (const s of liste) {
+    try { await hentFil("lyd/" + s.fil + ".bin"); } catch (e) { fejl++; }
+    n++; if (n % 5 === 0 || n === liste.length) $("hentstatus").textContent = "Henter " + n + " af " + liste.length + (fejl ? " (" + fejl + " fejl)" : "") + " …";
+  }
+  $("hentstatus").textContent = fejl ? fejl + " stykker kunne ikke hentes. Prøv igen." : "Lyden fra " + S.stykker[fra].afsnit + " til rapportens slutning er hentet.";
+  $("hent").disabled = false;
+}
+
+/* ---------- opstart ---------- */
+function byggAfsnitsliste() {
+  const sel = $("afsnit"); sel.innerHTML = "";
+  let grp = null, sidst = null;
+  S.stykker.forEach((s, i) => {
+    if (!grp || grp.dataset.kap !== s.kap) { grp = document.createElement("optgroup"); grp.label = "Kapitel " + s.kap; grp.dataset.kap = s.kap; sel.append(grp); }
+    if (s.afsnit !== sidst) { const o = document.createElement("option"); o.value = i; o.textContent = s.afsnit + " " + s.titel; grp.append(o); sidst = s.afsnit; }
+  });
+  let pos = 0; try { pos = parseInt(LS.getItem("pos:" + S.meta.rapport) || "0", 10) || 0; } catch (e) {}
+  if (pos > 0 && pos < S.stykker.length) {
+    const o = document.createElement("option"); o.value = pos; o.textContent = "Fortsæt hvor du slap (" + S.stykker[pos].afsnit + ")";
+    sel.prepend(o); sel.value = pos;
+  }
+  const minutter = {};
+  S.stykker.forEach(s => minutter[s.kap] = (minutter[s.kap] || 0) + s.tekst.split(" ").length / 165);
+  $("kapiteltid").textContent = Object.entries(minutter).map(([k, m]) => "Kap " + k + ": ca. " + Math.max(1, Math.round(m)) + " min").join(" · ");
+}
+async function test() {
+  stopAlt(); Lyt.stop(); await laasLydOp(); visBesked("");
+  $("udskrift").textContent = ""; S.sted = null;
+  saetTilstand("lytter"); $("hvor").textContent = "Sig noget, og afslut med «" + (ind("slutord") || "slut") + "» eller knappen Slut.";
+  const mit = ++koersel;
+  const r = ind("modus") === "tale" && Gjenk ? await lytKommentar() : await lytOptag();
+  if (mit !== koersel) return;
+  saetTilstand("klar"); knapper(false);
+  $("hvor").textContent = r.type === "kommentar" ? (r.tekst ? "Hørt: «" + r.tekst + "»" : "Optaget ca. " + r.varighed + " s lyd.") :
+    r.type === "pause" ? "Intet hørt." : r.type === "fejl" ? fejltekst(r.fejl) : r.type === "slut" ? "Kun slutordet hørt." : "Kommando: " + r.type;
+  if (r.lyd) { afsp.src = URL.createObjectURL(r.lyd); afsp.playbackRate = 1; afsp.play(); }
+}
+async function init() {
+  laesInd();
+  IND.forEach(k => $(k).addEventListener("change", () => { gemInd(); modusMaerke(); if (k === "vistekst") $("laesning").hidden = ind("vistekst") !== "ja"; }));
+  $("start").onclick = startKnap;
+  $("afsnit").addEventListener("change", () => { S.nytValg = true; });
+  $("naeste").onclick = () => { let j = S.i; while (j < S.stykker.length - 1 && !S.stykker[j].stop) j++; koer(Math.min(S.stykker.length - 1, j + 1)); };
+  $("tilbage").onclick = () => koer(gruppeStart(Math.max(0, gruppeStart(S.i) - 1)));
+  $("gentag").onclick = () => koer(gruppeStart(S.i));
+  $("kommentarknap").onclick = () => { if (S.t === "laeser") stopSagt("knap"); };
+  $("spoltilbage").onclick = () => spol(-5);
+  $("spolfrem").onclick = () => spol(5);
+  $("test").onclick = test;
+  $("hent").onclick = hentAlt;
+  $("del").onclick = del;
+  $("kopier").onclick = kopier;
+  $("ret").onclick = retKommentarer;
+  $("byglyd").onclick = bygLyd;
+  $("hentsvar").onclick = () => hentSvar(false);
+  $("maerke").onclick = () => { const s = S.stykker[S.i]; S.aendringFast = $("aendring").hidden; visAendring(s, S.aendringFast); };
+  $("maerke").onmouseenter = () => { if ($("aendring").hidden) visAendring(S.stykker[S.i], true); };
+  $("aendring").onmouseleave = () => { if (!S.aendringFast) visAendring(S.stykker[S.i], false); };
+  $("kommentarer").addEventListener("toggle", () => { if ($("kommentarer").open) hentSvar(true); });
+  afsp.addEventListener("pause", () => {
+    if (S.egenPause || S.t !== "laeser" || afsp.ended) return;
+    // lige efter at Siri er sat til at lytte, kan iPhonen selv sætte lyden på pause et øjeblik; så spilles der videre
+    if (Date.now() - S.lytStartet < 1200) { const p = afsp.play(); if (p) p.catch(() => pause()); return; }
+    // en afbrydelse udefra (opkald, en anden app) er en pause, ikke en kommentar; rattets pauseknap går gennem mediaSession
+    pause();
+  });
+  if ("mediaSession" in navigator) {
+    const ms = navigator.mediaSession, h = (a, f) => { try { ms.setActionHandler(a, f); } catch (e) {} };
+    h("play", () => { if (S.t === "pause") startKnap(); else if (S.t === "lytter" || S.t === "optager") { if (S.slutNu) S.slutNu(); } });
+    h("pause", () => { if (S.t === "laeser") stopSagt("knap"); });
+    h("nexttrack", () => $("naeste").click());
+    h("previoustrack", () => $("gentag").click());
+  }
+  modusMaerke();
+  try { S.cache = await caches.open("oplaesning-forsoeg-01-v1"); } catch (e) { S.cache = null; }
+  try { await DB.aabn(); } catch (e) { visBesked("Kommentarer kan ikke gemmes i denne browser (" + e.message + ").", true); }
+  S.noegle = await hentNoegle().catch(() => null);
+  if (!S.noegle) { visBesked("Linket mangler nøglen. Åbn siden fra det fulde link, du har fået.", true); $("start").disabled = true; return; }
+  try {
+    const data = JSON.parse(new TextDecoder().decode(await dekrypter(await hentFil("data.bin?v=" + Date.now()))));
+    S.meta = data; S.stykker = data.stykker;
+  } catch (e) { visBesked("Rapporten kunne ikke åbnes. Er linket rigtigt, og er der net?", true); $("start").disabled = true; return; }
+  $("rapportnavn").textContent = "Oplæsning · " + S.meta.rapport;
+  document.title = "Oplæsning · " + S.meta.rapport;
+  const udenTider = S.stykker.filter(s => !s.tider || !s.tider.length).length;
+  $("byggeinfo").textContent = "Bygget " + S.meta.bygget + " af " + S.meta.rapport + " (" + S.stykker.length + " stykker, stemme Jeppe" + (udenTider ? ", " + udenTider + " uden ordtider" : "") + ").";
+  byggAfsnitsliste();
+  await visKommentarer();
+  hentSvar(true);
+}
+function modusMaerke() {
+  const m = (ind("modus") === "tale" ? (Gjenk ? "Tekst" : "Tekst (Siri findes ikke her)") : "Lyd") + (ind("lytstop") === "ja" && Gjenk ? " · lytter efter «" + (ind("stopord") || "stop") + "»" : " · knappen");
+  $("modusmaerke").textContent = m;
+}
+init();
+// til afprøvning uden mikrofon: OPL.simuler("stop") spiller en hørt sætning ind, som om Siri havde hørt den
+window.OPL = { S, Lyt, DB, koer, stopSagt, retKommentarer, hentSvar, byggKommentarkort, visKommentarer, simuler: (segment, tekst) => Lyt.onRes && Lyt.onRes({ tekst: tekst != null ? tekst : segment, segment, endelig: true }) };
+</script>
+</body>
+</html>
